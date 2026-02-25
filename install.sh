@@ -14,6 +14,12 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
+# Pinned image references for reproducible deployment.
+# You can override them with environment variables, for example:
+#   MTG_IMAGE='nineseconds/mtg@sha256:<digest>' DD_IMAGE='telegrammessenger/proxy@sha256:<digest>' sudo -E bash install.sh
+MTG_IMAGE="${MTG_IMAGE:-nineseconds/mtg@sha256:f0e90be754c59e729bc4e219eeb210a602f7ad4e39167833166a176cd6fa0461}"
+DD_IMAGE="${DD_IMAGE:-telegrammessenger/proxy@sha256:73210d43c8f8e4c888ba4e30d6daf7742528e9134252a1cd538caabf5e24a597}"
+
 # ---------- i18n ----------
 UI_LANG="en"
 
@@ -73,6 +79,7 @@ t() {
         tls_abort) echo "Aborted because TLS check failed and user did not confirm continuation." ;;
         note_secret) echo "Do NOT share secrets publicly. Anyone with the secret can use your proxy." ;;
         note_no_cdn) echo "Important: DNS should be 'DNS only' (no CDN proxy). MTProto is not standard HTTPS." ;;
+        err_image_ref_invalid) echo "Image reference must be digest format: name@sha256:64hex. Please set MTG_IMAGE/DD_IMAGE." ;;
       esac
       ;;
     zh)
@@ -112,6 +119,7 @@ t() {
         tls_abort) echo "由于 TLS 检测失败且未确认继续，脚本已中止。" ;;
         note_secret) echo "不要公开分享 secret。任何拿到 secret 的人都能使用你的代理。" ;;
         note_no_cdn) echo "重要：DNS 必须是 DNS only/灰云（不要 CDN 代理）。MTProto 不是标准 HTTPS。" ;;
+        err_image_ref_invalid) echo "镜像引用必须是 digest 格式：name@sha256:64位十六进制。请设置 MTG_IMAGE/DD_IMAGE。" ;;
       esac
       ;;
     ko)
@@ -151,6 +159,7 @@ t() {
         tls_abort) echo "TLS 검사 실패 후 계속 확인이 없어 중단합니다." ;;
         note_secret) echo "시크릿을 공개 공유하지 마세요." ;;
         note_no_cdn) echo "중요: DNS only(프록시/CDN 금지)." ;;
+        err_image_ref_invalid) echo "이미지 참조는 digest 형식(name@sha256:64hex)이어야 합니다. MTG_IMAGE/DD_IMAGE를 설정하세요." ;;
       esac
       ;;
     ja)
@@ -190,6 +199,7 @@ t() {
         tls_abort) echo "TLS確認失敗かつ続行確認なしのため中止しました。" ;;
         note_secret) echo "シークレットを公開しないでください。" ;;
         note_no_cdn) echo "重要：DNSはDNS only（CDNプロキシ禁止）。" ;;
+        err_image_ref_invalid) echo "イメージ参照はdigest形式(name@sha256:64hex)である必要があります。MTG_IMAGE/DD_IMAGEを設定してください。" ;;
       esac
       ;;
   esac
@@ -310,6 +320,24 @@ collect_sshd_ports() {
   fi
 }
 
+is_valid_digest_image_ref() {
+  local image_ref="$1"
+  [[ "$image_ref" =~ ^[^[:space:]@]+@sha256:[a-f0-9]{64}$ ]]
+}
+
+validate_image_refs() {
+  if ! is_valid_digest_image_ref "$MTG_IMAGE"; then
+    echo "$(t err_image_ref_invalid)"
+    echo "MTG_IMAGE=${MTG_IMAGE}"
+    exit 1
+  fi
+  if ! is_valid_digest_image_ref "$DD_IMAGE"; then
+    echo "$(t err_image_ref_invalid)"
+    echo "DD_IMAGE=${DD_IMAGE}"
+    exit 1
+  fi
+}
+
 # ---------- Start ----------
 select_language
 echo
@@ -400,10 +428,11 @@ fi
 ufw reload >/dev/null
 
 # Step: Pull images
+validate_image_refs
 echo
 echo "$(t step_pull)"
-docker pull nineseconds/mtg:2 >/dev/null
-docker pull telegrammessenger/proxy:latest >/dev/null
+docker pull "$MTG_IMAGE" >/dev/null
+docker pull "$DD_IMAGE" >/dev/null
 
 # Step: Test TLS to fronting
 echo
@@ -421,7 +450,7 @@ fi
 # Step: Generate EE secret & config
 echo
 echo "$(t step_gen_ee)"
-EE_SECRET="$(docker run --rm nineseconds/mtg:2 generate-secret --hex "$FRONT_DOMAIN" | tr -d '\r\n')"
+EE_SECRET="$(docker run --rm "$MTG_IMAGE" generate-secret --hex "$FRONT_DOMAIN" | tr -d '\r\n')"
 mkdir -p /opt/mtg
 cat >/opt/mtg/config.toml <<EOF
 secret = "$EE_SECRET"
@@ -436,7 +465,7 @@ docker run -d --name mtg-ee \
   --restart unless-stopped \
   -v /opt/mtg/config.toml:/config.toml \
   -p "${EE_PORT}:3128" \
-  nineseconds/mtg:2 >/dev/null
+  "$MTG_IMAGE" >/dev/null
 
 # Step: Generate DD secret
 echo
@@ -452,12 +481,17 @@ docker run -d --name mtproto-dd \
   --restart unless-stopped \
   -p "${DD_PORT}:443" \
   -e SECRET="${DD_BASE_SECRET}" \
-  telegrammessenger/proxy:latest >/dev/null
+  "$DD_IMAGE" >/dev/null
 
 # Summary
 echo
 echo "$(t step_summary)"
 echo "$(t note_secret)"
+echo
+
+echo "Images       :"
+echo "MTG          : ${MTG_IMAGE}"
+echo "DD           : ${DD_IMAGE}"
 echo
 
 echo "================= EE (FakeTLS / mtg) ================="
