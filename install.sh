@@ -69,12 +69,22 @@ t() {
         ask_front_domain) echo "Enter fronting domain for EE (default: www.cloudflare.com): " ;;
         ask_ee_port) echo "Choose port for EE (recommended: 443). Enter a number: " ;;
         ask_dd_port) echo "Choose port for DD (recommended: 8443). Enter a number: " ;;
+        ask_port_menu) echo "Choose a port option:" ;;
+        opt_manual_input) echo "Manual input" ;;
+        opt_recommended) echo "recommended" ;;
         ask_enable_bbr) echo "Enable BBR+fq (recommended) [Y/n]: " ;;
         ask_continue_anyway) echo "Continue anyway? [y/N]: " ;;
         err_port_num) echo "Port must be a number between 1 and 65535." ;;
         err_port_conflict) echo "EE port and DD port cannot be the same on a single IP. Choose different ports." ;;
         err_port_in_use) echo "Port is already in use on this server. Choose another one." ;;
+        warn_443_busy) echo "Selected port is already in use." ;;
+        note_port_holders) echo "Current listeners on this port:" ;;
+        ask_cleanup_proxy_443) echo "Try to stop old proxy containers and re-check this port? [y/N]: " ;;
+        note_cleanup_done) echo "Cleanup attempted. Re-checking the selected port..." ;;
+        warn_cleanup_unavailable) echo "Docker not found, cannot auto-clean old proxy containers." ;;
+        warn_443_still_busy) echo "Selected port is still occupied after cleanup attempt." ;;
         err_empty) echo "This value cannot be empty." ;;
+        err_choice_invalid) echo "Invalid choice. Please enter one of the listed numbers." ;;
         err_mode_invalid) echo "Invalid mode. Choose 1, 2, or 3." ;;
         err_domain_invalid) echo "Invalid domain format. Example: sub.example.com" ;;
         warn_dns_unresolved) echo "Warning: domain has no A record yet." ;;
@@ -114,12 +124,22 @@ t() {
         ask_front_domain) echo "请输入 EE 的 fronting 域名（默认：www.cloudflare.com）： " ;;
         ask_ee_port) echo "请选择 EE 端口（推荐 443）。请输入端口号： " ;;
         ask_dd_port) echo "请选择 DD 端口（推荐 8443）。请输入端口号： " ;;
+        ask_port_menu) echo "请选择端口选项：" ;;
+        opt_manual_input) echo "手动输入" ;;
+        opt_recommended) echo "推荐" ;;
         ask_enable_bbr) echo "是否启用 BBR+fq（推荐）[Y/n]： " ;;
         ask_continue_anyway) echo "是否仍继续？[y/N]： " ;;
         err_port_num) echo "端口必须是 1~65535 的数字。" ;;
         err_port_conflict) echo "同一台机器的同一个 IP 上，EE 和 DD 不能使用同一个端口。请选不同端口。" ;;
         err_port_in_use) echo "该端口在本机已被占用。请换一个端口。" ;;
+        warn_443_busy) echo "所选端口已被占用。" ;;
+        note_port_holders) echo "当前占用该端口的监听项：" ;;
+        ask_cleanup_proxy_443) echo "是否尝试停止旧代理容器并重新检测该端口？[y/N]： " ;;
+        note_cleanup_done) echo "已尝试清理，正在重新检测所选端口..." ;;
+        warn_cleanup_unavailable) echo "未检测到 Docker，无法自动清理旧代理容器。" ;;
+        warn_443_still_busy) echo "清理后该端口仍被占用。" ;;
         err_empty) echo "该项不能为空。" ;;
+        err_choice_invalid) echo "选项无效，请输入列表中的数字。" ;;
         err_mode_invalid) echo "模式输入无效，请输入 1、2 或 3。" ;;
         err_domain_invalid) echo "域名格式不合法，例如：sub.example.com" ;;
         warn_dns_unresolved) echo "警告：该域名当前没有 A 记录。" ;;
@@ -159,12 +179,22 @@ t() {
         ask_front_domain) echo "EE 프론팅 도메인 입력(기본: www.cloudflare.com): " ;;
         ask_ee_port) echo "EE 포트 선택(권장: 443). 포트 번호 입력: " ;;
         ask_dd_port) echo "DD 포트 선택(권장: 8443). 포트 번호 입력: " ;;
+        ask_port_menu) echo "포트 옵션을 선택하세요:" ;;
+        opt_manual_input) echo "수동 입력" ;;
+        opt_recommended) echo "권장" ;;
         ask_enable_bbr) echo "BBR+fq 활성화(권장) [Y/n]: " ;;
         ask_continue_anyway) echo "계속 진행할까요? [y/N]: " ;;
         err_port_num) echo "포트는 1~65535 사이의 숫자여야 합니다." ;;
         err_port_conflict) echo "같은 IP에서 EE와 DD는 동일 포트를 사용할 수 없습니다." ;;
         err_port_in_use) echo "해당 포트가 이미 사용 중입니다." ;;
+        warn_443_busy) echo "선택한 포트가 이미 사용 중입니다." ;;
+        note_port_holders) echo "현재 이 포트를 점유 중인 리스너:" ;;
+        ask_cleanup_proxy_443) echo "기존 프록시 컨테이너를 중지하고 이 포트를 다시 확인할까요? [y/N]: " ;;
+        note_cleanup_done) echo "정리 시도 완료. 선택한 포트를 다시 확인합니다..." ;;
+        warn_cleanup_unavailable) echo "Docker가 없어 기존 프록시 컨테이너 자동 정리를 할 수 없습니다." ;;
+        warn_443_still_busy) echo "정리 후에도 선택한 포트가 여전히 점유 중입니다." ;;
         err_empty) echo "빈 값은 허용되지 않습니다." ;;
+        err_choice_invalid) echo "선택이 잘못되었습니다. 목록의 번호를 입력하세요." ;;
         err_mode_invalid) echo "모드 입력이 잘못되었습니다. 1, 2, 3 중에서 선택하세요." ;;
         err_domain_invalid) echo "도메인 형식이 올바르지 않습니다. 예: sub.example.com" ;;
         warn_dns_unresolved) echo "경고: 도메인에 A 레코드가 없습니다." ;;
@@ -204,12 +234,22 @@ t() {
         ask_front_domain) echo "EEのfrontingドメイン（既定：www.cloudflare.com）: " ;;
         ask_ee_port) echo "EEのポート（推奨: 443）。番号を入力: " ;;
         ask_dd_port) echo "DDのポート（推奨: 8443）。番号を入力: " ;;
+        ask_port_menu) echo "ポートオプションを選択してください:" ;;
+        opt_manual_input) echo "手動入力" ;;
+        opt_recommended) echo "推奨" ;;
         ask_enable_bbr) echo "BBR+fqを有効化（推奨）[Y/n]: " ;;
         ask_continue_anyway) echo "このまま続行しますか？ [y/N]: " ;;
         err_port_num) echo "ポートは1〜65535の数字である必要があります。" ;;
         err_port_conflict) echo "同一IPではEEとDDを同じポートにできません。" ;;
         err_port_in_use) echo "そのポートは既に使用中です。" ;;
+        warn_443_busy) echo "選択したポートは既に使用中です。" ;;
+        note_port_holders) echo "現在このポートで待受しているプロセス:" ;;
+        ask_cleanup_proxy_443) echo "旧プロキシコンテナを停止してこのポートを再確認しますか？ [y/N]: " ;;
+        note_cleanup_done) echo "クリーンアップを試行しました。選択ポートを再確認します..." ;;
+        warn_cleanup_unavailable) echo "Dockerが見つからないため旧プロキシコンテナを自動停止できません。" ;;
+        warn_443_still_busy) echo "クリーンアップ後も選択ポートは使用中です。" ;;
         err_empty) echo "空欄は不可です。" ;;
+        err_choice_invalid) echo "選択が不正です。表示された番号を入力してください。" ;;
         err_mode_invalid) echo "モード入力が不正です。1、2、3から選択してください。" ;;
         err_domain_invalid) echo "ドメイン形式が不正です。例: sub.example.com" ;;
         warn_dns_unresolved) echo "警告：ドメインにAレコードがありません。" ;;
@@ -248,6 +288,37 @@ port_in_use() {
   fi
 }
 
+show_port_holders() {
+  local p="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -lntp 2>/dev/null | awk -v port=":${p}" '$4 ~ port"$"'
+  elif command -v netstat >/dev/null 2>&1; then
+    netstat -lntp 2>/dev/null | awk -v port=":${p}" '$4 ~ port"$"'
+  fi
+}
+
+cleanup_old_proxy_containers() {
+  local ids named_ids image_ids
+  if ! command -v docker >/dev/null 2>&1; then
+    return 1
+  fi
+
+  named_ids="$(
+    {
+      docker ps -aq --filter name='^/mtg-ee$' 2>/dev/null || true
+      docker ps -aq --filter name='^/mtproto-dd$' 2>/dev/null || true
+    } | awk 'NF' | sort -u
+  )"
+  image_ids="$(docker ps -a --format '{{.ID}} {{.Image}}' 2>/dev/null \
+    | awk '$2 ~ /^nineseconds\/mtg(@sha256:|:)/ || $2 ~ /^telegrammessenger\/proxy(@sha256:|:)/ {print $1}' || true)"
+  ids="$(printf '%s\n%s\n' "$named_ids" "$image_ids" | awk 'NF' | sort -u)"
+
+  if [[ -n "$ids" ]]; then
+    docker rm -f $ids >/dev/null 2>&1 || true
+  fi
+  return 0
+}
+
 ask_domain() {
   local prompt_key="$1"
   local var_name="$2"
@@ -270,6 +341,43 @@ ask_domain() {
   done
 }
 
+check_and_prepare_port() {
+  local p="$1"
+  local do_cleanup=""
+
+  if ! is_port_number "$p"; then
+    echo "$(t err_port_num)"
+    return 1
+  fi
+
+  if port_in_use "$p"; then
+    echo "$(t warn_443_busy)"
+    echo "$(t note_port_holders)"
+    show_port_holders "$p" || true
+    echo -n "$(t ask_cleanup_proxy_443)"
+    read -r do_cleanup
+    if [[ "$do_cleanup" =~ ^[Yy]$ ]]; then
+      if cleanup_old_proxy_containers; then
+        echo "$(t note_cleanup_done)"
+      else
+        echo "$(t warn_cleanup_unavailable)"
+      fi
+      if port_in_use "$p"; then
+        echo "$(t warn_443_still_busy)"
+        echo "$(t note_port_holders)"
+        show_port_holders "$p" || true
+        echo "$(t err_port_in_use)"
+        return 1
+      fi
+      return 0
+    fi
+    echo "$(t err_port_in_use)"
+    return 1
+  fi
+
+  return 0
+}
+
 ask_port() {
   local prompt_key="$1"
   local var_name="$2"
@@ -278,16 +386,48 @@ ask_port() {
     echo -n "$(t "$prompt_key")"
     read -r p
     p="${p// /}"
-    if ! is_port_number "$p"; then
-      echo "$(t err_port_num)"
-      continue
+    if check_and_prepare_port "$p"; then
+      printf -v "$var_name" "%s" "$p"
+      return 0
     fi
-    if port_in_use "$p"; then
-      echo "$(t err_port_in_use)"
-      continue
+  done
+}
+
+ask_port_with_options() {
+  local prompt_key="$1"
+  local var_name="$2"
+  local opt1="$3"
+  local opt2="$4"
+  local opt3="$5"
+  local choice=""
+  local p=""
+
+  while true; do
+    echo "$(t ask_port_menu)"
+    echo "1) ${opt1} ($(t opt_recommended))"
+    echo "2) ${opt2}"
+    echo "3) ${opt3}"
+    echo "4) $(t opt_manual_input)"
+    read -rp "> " choice
+    choice="${choice// /}"
+    case "$choice" in
+      1) p="$opt1" ;;
+      2) p="$opt2" ;;
+      3) p="$opt3" ;;
+      4)
+        ask_port "$prompt_key" "$var_name"
+        return 0
+        ;;
+      *)
+        echo "$(t err_choice_invalid)"
+        continue
+        ;;
+    esac
+
+    if check_and_prepare_port "$p"; then
+      printf -v "$var_name" "%s" "$p"
+      return 0
     fi
-    printf -v "$var_name" "%s" "$p"
-    return 0
   done
 }
 
@@ -427,12 +567,12 @@ if [[ "$DEPLOY_EE" -eq 1 ]]; then
     exit 1
   fi
 
-  ask_port ask_ee_port EE_PORT
+  ask_port_with_options ask_ee_port EE_PORT "443" "8443" "9443"
 fi
 
 if [[ "$DEPLOY_DD" -eq 1 ]]; then
   ask_domain ask_dd_domain DD_DOMAIN
-  ask_port ask_dd_port DD_PORT
+  ask_port_with_options ask_dd_port DD_PORT "8443" "443" "9443"
 fi
 
 if [[ "$DEPLOY_EE" -eq 1 && "$DEPLOY_DD" -eq 1 && "$EE_PORT" == "$DD_PORT" ]]; then
