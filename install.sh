@@ -21,7 +21,13 @@ MTG_IMAGE="${MTG_IMAGE:-nineseconds/mtg@sha256:f0e90be754c59e729bc4e219eeb210a60
 DD_IMAGE="${DD_IMAGE:-telegrammessenger/proxy@sha256:73210d43c8f8e4c888ba4e30d6daf7742528e9134252a1cd538caabf5e24a597}"
 DEPLOY_EE=0
 DEPLOY_DD=0
-FRONT_DOMAINS=()
+CONFIG_DIR="/etc/telegram-proxy"
+EE_ENV_FILE="${CONFIG_DIR}/ee.env"
+DD_ENV_FILE="${CONFIG_DIR}/dd.env"
+EE_SERVICE_NAME="telegram-proxy-ee.service"
+DD_SERVICE_NAME="telegram-proxy-dd.service"
+EE_CONTAINER_NAME="mtg-ee"
+DD_CONTAINER_NAME="mtproto-dd"
 
 # ---------- i18n ----------
 UI_LANG="en"
@@ -580,209 +586,852 @@ validate_image_refs() {
   fi
 }
 
-# ---------- Start ----------
-select_language
-echo
-echo "============================================================"
-echo "$(t title)"
-echo "============================================================"
-echo "$(t need_dns)"
-echo "$(t note_no_cdn)"
-echo
+usage() {
+  cat <<'EOF'
+Usage:
+  install.sh [install]
+  install.sh uninstall [--mode ee|dd|all]
+  install.sh upgrade [--mode ee|dd|all] [--mtg-image IMAGE@sha256:...] [--dd-image IMAGE@sha256:...]
+  install.sh healthcheck [--mode ee|dd|all]
+  install.sh self-heal [--mode ee|dd|all]
+  install.sh rotate-secret --mode ee|dd [--secret SECRET] [--front-domain DOMAIN]
 
-# Inputs
-ask_deploy_mode
-
-EE_DOMAIN=""
-DD_DOMAIN=""
-FRONT_DOMAIN=""
-EE_PORT=""
-DD_PORT=""
-EE_SECRET=""
-DD_BASE_SECRET=""
-DD_SECRET=""
-
-if [[ "$DEPLOY_EE" -eq 1 ]]; then
-  ask_domain ask_ee_domain EE_DOMAIN
-
-  ask_front_domain_with_options
-
-  ask_port_with_options ask_ee_port EE_PORT "443" "8443" "9443"
-fi
-
-if [[ "$DEPLOY_DD" -eq 1 ]]; then
-  ask_domain ask_dd_domain DD_DOMAIN
-  ask_port_with_options ask_dd_port DD_PORT "8443" "443" "9443"
-fi
-
-if [[ "$DEPLOY_EE" -eq 1 && "$DEPLOY_DD" -eq 1 && "$EE_PORT" == "$DD_PORT" ]]; then
-  echo "$(t err_port_conflict)"
-  exit 1
-fi
-
-echo -n "$(t ask_enable_bbr)"
-read -r ENABLE_BBR
-ENABLE_BBR="${ENABLE_BBR:-Y}"
-
-# Step: Update + tools
-echo
-echo "$(t step_update)"
-apt-get update -y
-apt-get install -y ca-certificates curl gnupg lsb-release ufw openssl jq dnsutils iproute2
-
-# Step: DNS checks
-echo
-echo "$(t step_dns_check)"
-SERVER_IPV4="$(get_primary_ipv4)"
-if [[ "$DEPLOY_EE" -eq 1 ]]; then
-  check_domain_dns "$EE_DOMAIN" "$SERVER_IPV4"
-fi
-if [[ "$DEPLOY_DD" -eq 1 ]]; then
-  check_domain_dns "$DD_DOMAIN" "$SERVER_IPV4"
-fi
-
-# Step: Docker
-echo
-echo "$(t step_docker)"
-if ! command -v docker >/dev/null 2>&1; then
-  apt-get install -y docker.io
-fi
-systemctl enable --now docker
-
-# Step: Optional BBR
-if [[ "$ENABLE_BBR" =~ ^[Yy]$ ]]; then
-  echo
-  echo "$(t step_bbr_q)"
-  if sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | grep -qw bbr; then
-    cat >/etc/sysctl.d/99-bbr.conf <<'EOF'
-net.core.default_qdisc = fq
-net.ipv4.tcp_congestion_control = bbr
+Notes:
+  - Default command is 'install' (interactive).
+  - rotate-secret for DD accepts either 32-hex or dd+32-hex.
 EOF
-    if ! sysctl --system >/dev/null 2>&1; then
-      echo "$(t warn_bbr_apply_fail)"
-    fi
+}
+
+set_mode_flags() {
+  local mode="${1:-all}"
+  case "$mode" in
+    ee)
+      DEPLOY_EE=1
+      DEPLOY_DD=0
+      ;;
+    dd)
+      DEPLOY_EE=0
+      DEPLOY_DD=1
+      ;;
+    all)
+      DEPLOY_EE=1
+      DEPLOY_DD=1
+      ;;
+    *)
+      echo "Invalid mode: $mode"
+      return 1
+      ;;
+  esac
+}
+
+selected_mode_name() {
+  if [[ "$DEPLOY_EE" -eq 1 && "$DEPLOY_DD" -eq 1 ]]; then
+    echo "all"
+  elif [[ "$DEPLOY_EE" -eq 1 ]]; then
+    echo "ee"
   else
-    echo "$(t warn_bbr_unsupported)"
+    echo "dd"
   fi
-fi
+}
 
-# Step: Firewall (safe order)
-echo
-echo "$(t step_firewall)"
-ufw allow OpenSSH >/dev/null 2>&1 || true
-while read -r ssh_port; do
-  [[ -n "$ssh_port" ]] || continue
-  ufw allow "${ssh_port}/tcp" >/dev/null
-done < <(collect_sshd_ports)
-if [[ "$DEPLOY_EE" -eq 1 ]]; then
-  ufw allow "${EE_PORT}/tcp" >/dev/null
-fi
-if [[ "$DEPLOY_DD" -eq 1 ]]; then
-  ufw allow "${DD_PORT}/tcp" >/dev/null
-fi
-if ufw status | grep -qi inactive; then
-  ufw --force enable >/dev/null
-fi
-ufw reload >/dev/null
+is_valid_ipv4() {
+  local ip="$1"
+  local o1 o2 o3 o4
+  [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+  IFS='.' read -r o1 o2 o3 o4 <<<"$ip"
+  for octet in "$o1" "$o2" "$o3" "$o4"; do
+    ((octet >= 0 && octet <= 255)) || return 1
+  done
+}
 
-# Step: Pull images
-validate_image_refs
-echo
-echo "$(t step_pull)"
-if [[ "$DEPLOY_EE" -eq 1 ]]; then
-  docker pull "$MTG_IMAGE" >/dev/null
-fi
-if [[ "$DEPLOY_DD" -eq 1 ]]; then
-  docker pull "$DD_IMAGE" >/dev/null
-fi
+is_local_bind_ip() {
+  local ip="$1"
+  if [[ "$ip" == "0.0.0.0" ]]; then
+    return 0
+  fi
+  ip -4 -o addr show 2>/dev/null | awk '{split($4,a,"/"); print a[1]}' | grep -qx "$ip"
+}
 
-if [[ "$DEPLOY_EE" -eq 1 ]]; then
-  # Step: Test TLS to fronting
-  echo
-  echo "$(t step_front_test) (${FRONT_DOMAIN})"
-  if timeout 6 openssl s_client -connect "${FRONT_DOMAIN}:443" -servername "${FRONT_DOMAIN}" </dev/null >/dev/null 2>&1; then
-    echo "$(t tls_ok)"
-  else
-    echo "$(t tls_fail)"
+ask_bind_ip_with_options() {
+  local var_name="$1"
+  local primary_ip="$2"
+  local choice=""
+  local input_ip=""
+  while true; do
+    echo "Choose bind IP / 选择绑定IP:"
+    echo "1) 0.0.0.0 (all interfaces, recommended)"
+    if [[ -n "$primary_ip" ]]; then
+      echo "2) ${primary_ip} (primary IPv4)"
+    else
+      echo "2) primary IPv4 (unavailable)"
+    fi
+    echo "3) Manual input / 手动输入"
+    read -rp "> " choice
+    choice="${choice// /}"
+    case "$choice" in
+      1)
+        printf -v "$var_name" "0.0.0.0"
+        return 0
+        ;;
+      2)
+        if [[ -n "$primary_ip" ]]; then
+          printf -v "$var_name" "%s" "$primary_ip"
+          return 0
+        fi
+        echo "Primary IPv4 unavailable."
+        ;;
+      3)
+        read -rp "Enter bind IPv4 (or 0.0.0.0): " input_ip
+        input_ip="${input_ip// /}"
+        if ! is_valid_ipv4 "$input_ip"; then
+          echo "Invalid IPv4 format."
+          continue
+        fi
+        if ! is_local_bind_ip "$input_ip"; then
+          echo "IP not found on this host."
+          continue
+        fi
+        printf -v "$var_name" "%s" "$input_ip"
+        return 0
+        ;;
+      *)
+        echo "$(t err_choice_invalid)"
+        ;;
+    esac
+  done
+}
+
+ports_conflict_for_bindings() {
+  local p1="$1"
+  local ip1="$2"
+  local p2="$3"
+  local ip2="$4"
+  [[ "$p1" == "$p2" ]] || return 1
+  if [[ "$ip1" == "0.0.0.0" || "$ip2" == "0.0.0.0" || "$ip1" == "$ip2" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+preflight_checks() {
+  local warnings=()
+  local mem_kb=""
+  local disk_mb=""
+  local os_id="" os_version=""
+  local ntp_sync=""
+
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "Critical: systemctl is required."
+    exit 1
+  fi
+  if [[ "$(ps -p 1 -o comm= 2>/dev/null || true)" != "systemd" ]]; then
+    warnings+=("PID 1 is not systemd; service management may fail.")
+  fi
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "Critical: apt-get is required."
+    exit 1
+  fi
+
+  if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    os_id="${ID:-}"
+    os_version="${VERSION_ID:-}"
+    if [[ "$os_id" != "ubuntu" || "$os_version" != "22.04" ]]; then
+      warnings+=("Target is tuned for Ubuntu 22.04; detected ${os_id:-unknown} ${os_version:-unknown}.")
+    fi
+  fi
+
+  mem_kb="$(awk '/MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || true)"
+  if [[ -n "$mem_kb" ]] && ((mem_kb < 524288)); then
+    warnings+=("Memory is below 512MB; proxy stability may be poor.")
+  fi
+
+  disk_mb="$(df -Pm / 2>/dev/null | awk 'NR==2 {print $4}' || true)"
+  if [[ -n "$disk_mb" ]] && ((disk_mb < 1024)); then
+    warnings+=("Free disk is below 1GB.")
+  fi
+
+  if command -v timedatectl >/dev/null 2>&1; then
+    ntp_sync="$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)"
+    if [[ "$ntp_sync" != "yes" ]]; then
+      warnings+=("NTP is not synchronized; time skew can hurt TLS and networking.")
+    fi
+  fi
+
+  if ! getent hosts registry-1.docker.io >/dev/null 2>&1; then
+    warnings+=("DNS lookup for registry-1.docker.io failed; Docker pull may fail.")
+  fi
+
+  if ((${#warnings[@]} > 0)); then
+    echo
+    echo "Preflight warnings:"
+    printf ' - %s\n' "${warnings[@]}"
     if ! confirm_continue; then
-      echo "$(t tls_abort)"
+      echo "Aborted by user."
       exit 1
     fi
   fi
+}
 
-  # Step: Generate EE secret & config
-  echo
-  echo "$(t step_gen_ee)"
-  EE_SECRET="$(docker run --rm "$MTG_IMAGE" generate-secret --hex "$FRONT_DOMAIN" | tr -d '\r\n')"
-  mkdir -p /opt/mtg
-  cat >/opt/mtg/config.toml <<EOF
+ensure_config_dir() {
+  mkdir -p "$CONFIG_DIR"
+  chmod 700 "$CONFIG_DIR"
+}
+
+write_ee_env_file() {
+  umask 077
+  cat >"$EE_ENV_FILE" <<EOF
+EE_DOMAIN=${EE_DOMAIN}
+FRONT_DOMAIN=${FRONT_DOMAIN}
+EE_PORT=${EE_PORT}
+EE_BIND_IP=${EE_BIND_IP}
+MTG_IMAGE=${MTG_IMAGE}
+EE_SECRET=${EE_SECRET}
+EOF
+}
+
+write_dd_env_file() {
+  umask 077
+  cat >"$DD_ENV_FILE" <<EOF
+DD_DOMAIN=${DD_DOMAIN}
+DD_PORT=${DD_PORT}
+DD_BIND_IP=${DD_BIND_IP}
+DD_BASE_SECRET=${DD_BASE_SECRET}
+DD_SECRET=${DD_SECRET}
+DD_IMAGE=${DD_IMAGE}
+EOF
+}
+
+write_ee_systemd_unit() {
+  cat >/etc/systemd/system/"$EE_SERVICE_NAME" <<'EOF'
+[Unit]
+Description=Telegram Proxy EE (mtg)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+EnvironmentFile=-/etc/telegram-proxy/ee.env
+ExecStartPre=-/usr/bin/docker rm -f mtg-ee
+ExecStart=/usr/bin/docker run --name mtg-ee --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=256 -v /opt/mtg/config.toml:/config.toml:ro -p ${EE_BIND_IP}:${EE_PORT}:3128 ${MTG_IMAGE}
+ExecStop=/usr/bin/docker stop -t 10 mtg-ee
+ExecStopPost=-/usr/bin/docker rm -f mtg-ee
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+write_dd_systemd_unit() {
+  cat >/etc/systemd/system/"$DD_SERVICE_NAME" <<'EOF'
+[Unit]
+Description=Telegram Proxy DD (MTProxy padding)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+EnvironmentFile=-/etc/telegram-proxy/dd.env
+ExecStartPre=-/usr/bin/docker rm -f mtproto-dd
+ExecStart=/usr/bin/docker run --name mtproto-dd --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=256 -p ${DD_BIND_IP}:${DD_PORT}:443 -e SECRET=${DD_BASE_SECRET} ${DD_IMAGE}
+ExecStop=/usr/bin/docker stop -t 10 mtproto-dd
+ExecStopPost=-/usr/bin/docker rm -f mtproto-dd
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+systemd_reload() {
+  systemctl daemon-reload
+}
+
+load_env_file() {
+  local f="$1"
+  [[ -f "$f" ]] || return 1
+  # shellcheck disable=SC1090
+  source "$f"
+}
+
+upsert_env_key() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+  if grep -q "^${key}=" "$file" 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+  else
+    printf '%s=%s\n' "$key" "$value" >>"$file"
+  fi
+}
+
+check_mode_health() {
+  local mode="$1"
+  local service_name=""
+  local container_name=""
+  local env_file=""
+  local port=""
+  local ok=0
+
+  case "$mode" in
+    ee)
+      service_name="$EE_SERVICE_NAME"
+      container_name="$EE_CONTAINER_NAME"
+      env_file="$EE_ENV_FILE"
+      ;;
+    dd)
+      service_name="$DD_SERVICE_NAME"
+      container_name="$DD_CONTAINER_NAME"
+      env_file="$DD_ENV_FILE"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  if [[ ! -f "$env_file" ]]; then
+    echo "[${mode}] not installed (env missing: ${env_file})"
+    return 2
+  fi
+
+  if ! systemctl is-active --quiet "$service_name"; then
+    echo "[${mode}] service not active: ${service_name}"
+    ok=1
+  fi
+
+  if ! docker ps --format '{{.Names}}' | grep -qx "$container_name"; then
+    echo "[${mode}] container not running: ${container_name}"
+    ok=1
+  fi
+
+  # shellcheck disable=SC1090
+  source "$env_file"
+  if [[ "$mode" == "ee" ]]; then
+    port="${EE_PORT}"
+  else
+    port="${DD_PORT}"
+  fi
+  if ! port_in_use "$port"; then
+    echo "[${mode}] port not listening: ${port}"
+    ok=1
+  fi
+
+  if [[ "$ok" -eq 0 ]]; then
+    echo "[${mode}] healthy"
+    return 0
+  fi
+  return 1
+}
+
+cmd_healthcheck() {
+  local failed=0
+  local rc=0
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    check_mode_health ee || rc=$?
+    if [[ "$rc" -eq 1 ]]; then
+      failed=1
+    fi
+  fi
+  rc=0
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    check_mode_health dd || rc=$?
+    if [[ "$rc" -eq 1 ]]; then
+      failed=1
+    fi
+  fi
+  return "$failed"
+}
+
+cmd_self_heal() {
+  local failed=0
+  local rc=0
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    check_mode_health ee || rc=$?
+    if [[ "$rc" -eq 1 ]]; then
+      echo "[ee] attempting restart..."
+      systemctl restart "$EE_SERVICE_NAME" || true
+      sleep 2
+      check_mode_health ee || failed=1
+    fi
+  fi
+  rc=0
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    check_mode_health dd || rc=$?
+    if [[ "$rc" -eq 1 ]]; then
+      echo "[dd] attempting restart..."
+      systemctl restart "$DD_SERVICE_NAME" || true
+      sleep 2
+      check_mode_health dd || failed=1
+    fi
+  fi
+  return "$failed"
+}
+
+cmd_uninstall() {
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    systemctl disable --now "$EE_SERVICE_NAME" >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/"$EE_SERVICE_NAME" "$EE_ENV_FILE"
+    docker rm -f "$EE_CONTAINER_NAME" >/dev/null 2>&1 || true
+    rm -f /opt/mtg/config.toml
+  fi
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    systemctl disable --now "$DD_SERVICE_NAME" >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/"$DD_SERVICE_NAME" "$DD_ENV_FILE"
+    docker rm -f "$DD_CONTAINER_NAME" >/dev/null 2>&1 || true
+  fi
+  systemd_reload
+  rmdir "$CONFIG_DIR" >/dev/null 2>&1 || true
+}
+
+cmd_upgrade() {
+  local mtg_new_image="$1"
+  local dd_new_image="$2"
+  local current_mtg_image=""
+  local current_dd_image=""
+
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    [[ -f "$EE_ENV_FILE" ]] || { echo "EE is not installed."; return 1; }
+    # shellcheck disable=SC1090
+    source "$EE_ENV_FILE"
+    current_mtg_image="${MTG_IMAGE:-}"
+    mtg_new_image="${mtg_new_image:-$current_mtg_image}"
+    if ! is_valid_digest_image_ref "$mtg_new_image"; then
+      echo "Invalid MTG image digest: $mtg_new_image"
+      return 1
+    fi
+    upsert_env_key "$EE_ENV_FILE" "MTG_IMAGE" "$mtg_new_image"
+    docker pull "$mtg_new_image"
+    systemctl restart "$EE_SERVICE_NAME"
+  fi
+
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    [[ -f "$DD_ENV_FILE" ]] || { echo "DD is not installed."; return 1; }
+    # shellcheck disable=SC1090
+    source "$DD_ENV_FILE"
+    current_dd_image="${DD_IMAGE:-}"
+    dd_new_image="${dd_new_image:-$current_dd_image}"
+    if ! is_valid_digest_image_ref "$dd_new_image"; then
+      echo "Invalid DD image digest: $dd_new_image"
+      return 1
+    fi
+    upsert_env_key "$DD_ENV_FILE" "DD_IMAGE" "$dd_new_image"
+    docker pull "$dd_new_image"
+    systemctl restart "$DD_SERVICE_NAME"
+  fi
+}
+
+normalize_dd_secret() {
+  local input="${1,,}"
+  if [[ "$input" =~ ^dd[a-f0-9]{32}$ ]]; then
+    DD_BASE_SECRET="${input#dd}"
+    DD_SECRET="$input"
+    return 0
+  fi
+  if [[ "$input" =~ ^[a-f0-9]{32}$ ]]; then
+    DD_BASE_SECRET="$input"
+    DD_SECRET="dd${input}"
+    return 0
+  fi
+  return 1
+}
+
+cmd_rotate_secret() {
+  local mode="$1"
+  local input_secret="$2"
+  local front_domain_arg="$3"
+
+  case "$mode" in
+    ee)
+      [[ -f "$EE_ENV_FILE" ]] || { echo "EE is not installed."; return 1; }
+      # shellcheck disable=SC1090
+      source "$EE_ENV_FILE"
+      if [[ -z "$input_secret" ]]; then
+        read -rp "Enter new EE secret (hex). Leave empty to auto-generate: " input_secret
+      fi
+      if [[ -z "$input_secret" ]]; then
+        local use_front=""
+        use_front="${front_domain_arg:-${FRONT_DOMAIN:-}}"
+        if [[ -z "$use_front" ]]; then
+          ask_domain ask_front_domain use_front
+        fi
+        input_secret="$(docker run --rm "$MTG_IMAGE" generate-secret --hex "$use_front" | tr -d '\r\n')"
+        upsert_env_key "$EE_ENV_FILE" "FRONT_DOMAIN" "$use_front"
+      fi
+      if [[ ! "$input_secret" =~ ^[A-Fa-f0-9]{32,}$ ]]; then
+        echo "Invalid EE secret format."
+        return 1
+      fi
+      EE_SECRET="${input_secret,,}"
+      mkdir -p /opt/mtg
+      cat >/opt/mtg/config.toml <<EOF
 secret = "$EE_SECRET"
 bind-to = "0.0.0.0:3128"
 EOF
+      upsert_env_key "$EE_ENV_FILE" "EE_SECRET" "$EE_SECRET"
+      systemctl restart "$EE_SERVICE_NAME"
+      ;;
+    dd)
+      [[ -f "$DD_ENV_FILE" ]] || { echo "DD is not installed."; return 1; }
+      if [[ -z "$input_secret" ]]; then
+        read -rp "Enter new DD secret (32-hex or dd+32-hex): " input_secret
+      fi
+      if ! normalize_dd_secret "$input_secret"; then
+        echo "Invalid DD secret format."
+        return 1
+      fi
+      upsert_env_key "$DD_ENV_FILE" "DD_BASE_SECRET" "$DD_BASE_SECRET"
+      upsert_env_key "$DD_ENV_FILE" "DD_SECRET" "$DD_SECRET"
+      systemctl restart "$DD_SERVICE_NAME"
+      ;;
+    *)
+      echo "rotate-secret requires --mode ee|dd"
+      return 1
+      ;;
+  esac
+}
 
-  # Step: Run EE
+command_install() {
+  local SERVER_IPV4=""
+  local ENABLE_BBR="Y"
+  local EE_BIND_IP="0.0.0.0"
+  local DD_BIND_IP="0.0.0.0"
+
+  select_language
   echo
-  echo "$(t step_run_ee) (port ${EE_PORT})"
-  docker rm -f mtg-ee >/dev/null 2>&1 || true
-  docker run -d --name mtg-ee \
-    --restart unless-stopped \
-    -v /opt/mtg/config.toml:/config.toml \
-    -p "${EE_PORT}:3128" \
-    "$MTG_IMAGE" >/dev/null
-fi
-
-if [[ "$DEPLOY_DD" -eq 1 ]]; then
-  # Step: Generate DD secret
+  echo "============================================================"
+  echo "$(t title)"
+  echo "============================================================"
+  echo "$(t need_dns)"
+  echo "$(t note_no_cdn)"
   echo
-  echo "$(t step_gen_dd)"
-  DD_BASE_SECRET="$(openssl rand -hex 16)"
-  DD_SECRET="dd${DD_BASE_SECRET}"
 
-  # Step: Run DD
+  ask_deploy_mode
+
+  EE_DOMAIN=""
+  DD_DOMAIN=""
+  FRONT_DOMAIN=""
+  EE_PORT=""
+  DD_PORT=""
+  EE_SECRET=""
+  DD_BASE_SECRET=""
+  DD_SECRET=""
+
+  SERVER_IPV4="$(get_primary_ipv4)"
+
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    ask_domain ask_ee_domain EE_DOMAIN
+    ask_front_domain_with_options
+    ask_port_with_options ask_ee_port EE_PORT "443" "8443" "9443"
+    ask_bind_ip_with_options EE_BIND_IP "$SERVER_IPV4"
+  fi
+
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    ask_domain ask_dd_domain DD_DOMAIN
+    ask_port_with_options ask_dd_port DD_PORT "8443" "443" "9443"
+    ask_bind_ip_with_options DD_BIND_IP "$SERVER_IPV4"
+  fi
+
+  if [[ "$DEPLOY_EE" -eq 1 && "$DEPLOY_DD" -eq 1 ]] && ports_conflict_for_bindings "$EE_PORT" "$EE_BIND_IP" "$DD_PORT" "$DD_BIND_IP"; then
+    echo "$(t err_port_conflict)"
+    exit 1
+  fi
+
+  echo -n "$(t ask_enable_bbr)"
+  read -r ENABLE_BBR
+  ENABLE_BBR="${ENABLE_BBR:-Y}"
+
+  preflight_checks
+
   echo
-  echo "$(t step_run_dd) (port ${DD_PORT})"
-  docker rm -f mtproto-dd >/dev/null 2>&1 || true
-  docker run -d --name mtproto-dd \
-    --restart unless-stopped \
-    -p "${DD_PORT}:443" \
-    -e SECRET="${DD_BASE_SECRET}" \
-    "$DD_IMAGE" >/dev/null
-fi
+  echo "$(t step_update)"
+  apt-get update -y
+  apt-get install -y ca-certificates curl gnupg lsb-release ufw openssl jq dnsutils iproute2
 
-# Summary
-echo
-echo "$(t step_summary)"
-echo "$(t note_secret)"
-echo
-
-echo "Images       :"
-if [[ "$DEPLOY_EE" -eq 1 ]]; then
-  echo "MTG          : ${MTG_IMAGE}"
-fi
-if [[ "$DEPLOY_DD" -eq 1 ]]; then
-  echo "DD           : ${DD_IMAGE}"
-fi
-echo
-
-if [[ "$DEPLOY_EE" -eq 1 ]]; then
-  echo "================= EE (FakeTLS / mtg) ================="
-  echo "Entry domain : ${EE_DOMAIN}"
-  echo "Port         : ${EE_PORT}"
-  echo "Fronting     : ${FRONT_DOMAIN}"
-  echo "Secret (EE)  : ${EE_SECRET}"
-  echo "Import link  : tg://proxy?server=${EE_DOMAIN}&port=${EE_PORT}&secret=${EE_SECRET}"
   echo
-fi
-if [[ "$DEPLOY_DD" -eq 1 ]]; then
-  echo "================= DD (padding / MTProxy) ============="
-  echo "Entry domain : ${DD_DOMAIN}"
-  echo "Port         : ${DD_PORT}"
-  echo "Secret (DD)  : ${DD_SECRET}"
-  echo "Import link  : tg://proxy?server=${DD_DOMAIN}&port=${DD_PORT}&secret=${DD_SECRET}"
+  echo "$(t step_dns_check)"
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    check_domain_dns "$EE_DOMAIN" "$SERVER_IPV4"
+  fi
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    check_domain_dns "$DD_DOMAIN" "$SERVER_IPV4"
+  fi
+
   echo
-fi
-echo "Docker status:"
-docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}'
-echo
-echo "Firewall status:"
-ufw status numbered || true
+  echo "$(t step_docker)"
+  if ! command -v docker >/dev/null 2>&1; then
+    apt-get install -y docker.io
+  fi
+  systemctl enable --now docker
+
+  if [[ "$ENABLE_BBR" =~ ^[Yy]$ ]]; then
+    echo
+    echo "$(t step_bbr_q)"
+    if sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | grep -qw bbr; then
+      cat >/etc/sysctl.d/99-bbr.conf <<'EOF'
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+EOF
+      if ! sysctl --system >/dev/null 2>&1; then
+        echo "$(t warn_bbr_apply_fail)"
+      fi
+    else
+      echo "$(t warn_bbr_unsupported)"
+    fi
+  fi
+
+  echo
+  echo "$(t step_firewall)"
+  ufw allow OpenSSH >/dev/null 2>&1 || true
+  while read -r ssh_port; do
+    [[ -n "$ssh_port" ]] || continue
+    ufw allow "${ssh_port}/tcp" >/dev/null
+  done < <(collect_sshd_ports)
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    ufw allow "${EE_PORT}/tcp" >/dev/null
+  fi
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    ufw allow "${DD_PORT}/tcp" >/dev/null
+  fi
+  if ufw status | grep -qi inactive; then
+    ufw --force enable >/dev/null
+  fi
+  ufw reload >/dev/null
+
+  validate_image_refs
+  echo
+  echo "$(t step_pull)"
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    docker pull "$MTG_IMAGE" >/dev/null
+  fi
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    docker pull "$DD_IMAGE" >/dev/null
+  fi
+
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    echo
+    echo "$(t step_front_test) (${FRONT_DOMAIN})"
+    if timeout 6 openssl s_client -connect "${FRONT_DOMAIN}:443" -servername "${FRONT_DOMAIN}" </dev/null >/dev/null 2>&1; then
+      echo "$(t tls_ok)"
+    else
+      echo "$(t tls_fail)"
+      if ! confirm_continue; then
+        echo "$(t tls_abort)"
+        exit 1
+      fi
+    fi
+  fi
+
+  ensure_config_dir
+  mkdir -p /opt/mtg
+
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    echo
+    echo "$(t step_gen_ee)"
+    EE_SECRET="$(docker run --rm "$MTG_IMAGE" generate-secret --hex "$FRONT_DOMAIN" | tr -d '\r\n')"
+    cat >/opt/mtg/config.toml <<EOF
+secret = "$EE_SECRET"
+bind-to = "0.0.0.0:3128"
+EOF
+    write_ee_env_file
+    write_ee_systemd_unit
+  fi
+
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    echo
+    echo "$(t step_gen_dd)"
+    DD_BASE_SECRET="$(openssl rand -hex 16)"
+    DD_SECRET="dd${DD_BASE_SECRET}"
+    write_dd_env_file
+    write_dd_systemd_unit
+  fi
+
+  systemd_reload
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    echo
+    echo "$(t step_run_ee) (port ${EE_PORT})"
+    systemctl enable --now "$EE_SERVICE_NAME"
+  fi
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    echo
+    echo "$(t step_run_dd) (port ${DD_PORT})"
+    systemctl enable --now "$DD_SERVICE_NAME"
+  fi
+
+  echo
+  echo "$(t step_summary)"
+  echo "$(t note_secret)"
+  echo
+  echo "Images       :"
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    echo "MTG          : ${MTG_IMAGE}"
+  fi
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    echo "DD           : ${DD_IMAGE}"
+  fi
+  echo
+
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    echo "================= EE (FakeTLS / mtg) ================="
+    echo "Entry domain : ${EE_DOMAIN}"
+    echo "Bind IP      : ${EE_BIND_IP}"
+    echo "Port         : ${EE_PORT}"
+    echo "Fronting     : ${FRONT_DOMAIN}"
+    echo "Secret (EE)  : ${EE_SECRET}"
+    echo "Import link  : tg://proxy?server=${EE_DOMAIN}&port=${EE_PORT}&secret=${EE_SECRET}"
+    echo
+  fi
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    echo "================= DD (padding / MTProxy) ============="
+    echo "Entry domain : ${DD_DOMAIN}"
+    echo "Bind IP      : ${DD_BIND_IP}"
+    echo "Port         : ${DD_PORT}"
+    echo "Secret (DD)  : ${DD_SECRET}"
+    echo "Import link  : tg://proxy?server=${DD_DOMAIN}&port=${DD_PORT}&secret=${DD_SECRET}"
+    echo
+  fi
+  cmd_healthcheck || true
+}
+
+main() {
+  local cmd="${1:-install}"
+  local mode="all"
+  local mtg_image_arg=""
+  local dd_image_arg=""
+  local rotate_mode=""
+  local rotate_secret=""
+  local rotate_front=""
+
+  case "$cmd" in
+    install)
+      command_install
+      ;;
+    uninstall)
+      shift || true
+      while (($#)); do
+        case "$1" in
+          --mode)
+            mode="${2:-all}"
+            shift 2
+            ;;
+          *)
+            echo "Unknown argument: $1"
+            usage
+            exit 1
+            ;;
+        esac
+      done
+      set_mode_flags "$mode" || exit 1
+      cmd_uninstall
+      ;;
+    upgrade)
+      shift || true
+      while (($#)); do
+        case "$1" in
+          --mode)
+            mode="${2:-all}"
+            shift 2
+            ;;
+          --mtg-image)
+            mtg_image_arg="${2:-}"
+            shift 2
+            ;;
+          --dd-image)
+            dd_image_arg="${2:-}"
+            shift 2
+            ;;
+          *)
+            echo "Unknown argument: $1"
+            usage
+            exit 1
+            ;;
+        esac
+      done
+      set_mode_flags "$mode" || exit 1
+      cmd_upgrade "$mtg_image_arg" "$dd_image_arg"
+      cmd_healthcheck
+      ;;
+    healthcheck)
+      shift || true
+      while (($#)); do
+        case "$1" in
+          --mode)
+            mode="${2:-all}"
+            shift 2
+            ;;
+          *)
+            echo "Unknown argument: $1"
+            usage
+            exit 1
+            ;;
+        esac
+      done
+      set_mode_flags "$mode" || exit 1
+      cmd_healthcheck
+      ;;
+    self-heal|self_heal)
+      shift || true
+      while (($#)); do
+        case "$1" in
+          --mode)
+            mode="${2:-all}"
+            shift 2
+            ;;
+          *)
+            echo "Unknown argument: $1"
+            usage
+            exit 1
+            ;;
+        esac
+      done
+      set_mode_flags "$mode" || exit 1
+      cmd_self_heal
+      ;;
+    rotate-secret|rotate_secret)
+      shift || true
+      while (($#)); do
+        case "$1" in
+          --mode)
+            rotate_mode="${2:-}"
+            shift 2
+            ;;
+          --secret)
+            rotate_secret="${2:-}"
+            shift 2
+            ;;
+          --front-domain)
+            rotate_front="${2:-}"
+            shift 2
+            ;;
+          *)
+            echo "Unknown argument: $1"
+            usage
+            exit 1
+            ;;
+        esac
+      done
+      if [[ -z "$rotate_mode" ]]; then
+        echo "rotate-secret requires --mode ee|dd"
+        exit 1
+      fi
+      cmd_rotate_secret "$rotate_mode" "$rotate_secret" "$rotate_front"
+      set_mode_flags "$rotate_mode" || exit 1
+      cmd_healthcheck
+      ;;
+    -h|--help|help)
+      usage
+      ;;
+    *)
+      echo "Unknown command: $cmd"
+      usage
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"
