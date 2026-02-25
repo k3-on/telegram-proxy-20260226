@@ -19,6 +19,8 @@ fi
 #   MTG_IMAGE='nineseconds/mtg@sha256:<digest>' DD_IMAGE='telegrammessenger/proxy@sha256:<digest>' sudo -E bash install.sh
 MTG_IMAGE="${MTG_IMAGE:-nineseconds/mtg@sha256:f0e90be754c59e729bc4e219eeb210a602f7ad4e39167833166a176cd6fa0461}"
 DD_IMAGE="${DD_IMAGE:-telegrammessenger/proxy@sha256:73210d43c8f8e4c888ba4e30d6daf7742528e9134252a1cd538caabf5e24a597}"
+DEPLOY_EE=0
+DEPLOY_DD=0
 
 # ---------- i18n ----------
 UI_LANG="en"
@@ -58,6 +60,10 @@ t() {
         step_run_dd) echo "Step: Starting MTProxy (DD) on your chosen port." ;;
         step_dns_check) echo "Step: Checking entry domains DNS resolution." ;;
         step_summary) echo "Done. Below are the settings and one-click import links." ;;
+        ask_mode) echo "Choose deployment mode:" ;;
+        mode_ee_only) echo "EE only (FakeTLS via mtg)" ;;
+        mode_dd_only) echo "DD only (padding via MTProxy)" ;;
+        mode_both) echo "EE + DD (recommended dual-line)" ;;
         ask_ee_domain) echo "Enter entry domain for EE (example: ee.example.com): " ;;
         ask_dd_domain) echo "Enter entry domain for DD (example: dd.example.com): " ;;
         ask_front_domain) echo "Enter fronting domain for EE (default: www.cloudflare.com): " ;;
@@ -69,6 +75,7 @@ t() {
         err_port_conflict) echo "EE port and DD port cannot be the same on a single IP. Choose different ports." ;;
         err_port_in_use) echo "Port is already in use on this server. Choose another one." ;;
         err_empty) echo "This value cannot be empty." ;;
+        err_mode_invalid) echo "Invalid mode. Choose 1, 2, or 3." ;;
         err_domain_invalid) echo "Invalid domain format. Example: sub.example.com" ;;
         warn_dns_unresolved) echo "Warning: domain has no A record yet." ;;
         warn_dns_mismatch) echo "Warning: domain A records do not include this server IPv4." ;;
@@ -98,6 +105,10 @@ t() {
         step_run_dd) echo "步骤：启动 MTProxy（DD）并监听你选择的端口。" ;;
         step_dns_check) echo "步骤：检查入口域名 DNS 解析情况。" ;;
         step_summary) echo "完成。下面输出配置与一键导入链接。" ;;
+        ask_mode) echo "请选择部署模式：" ;;
+        mode_ee_only) echo "仅 EE（FakeTLS / mtg）" ;;
+        mode_dd_only) echo "仅 DD（padding / MTProxy）" ;;
+        mode_both) echo "EE + DD（双线路，推荐）" ;;
         ask_ee_domain) echo "请输入 EE 入口域名（例如：ee.example.com）： " ;;
         ask_dd_domain) echo "请输入 DD 入口域名（例如：dd.example.com）： " ;;
         ask_front_domain) echo "请输入 EE 的 fronting 域名（默认：www.cloudflare.com）： " ;;
@@ -109,6 +120,7 @@ t() {
         err_port_conflict) echo "同一台机器的同一个 IP 上，EE 和 DD 不能使用同一个端口。请选不同端口。" ;;
         err_port_in_use) echo "该端口在本机已被占用。请换一个端口。" ;;
         err_empty) echo "该项不能为空。" ;;
+        err_mode_invalid) echo "模式输入无效，请输入 1、2 或 3。" ;;
         err_domain_invalid) echo "域名格式不合法，例如：sub.example.com" ;;
         warn_dns_unresolved) echo "警告：该域名当前没有 A 记录。" ;;
         warn_dns_mismatch) echo "警告：该域名的 A 记录未包含本机 IPv4。" ;;
@@ -138,6 +150,10 @@ t() {
         step_run_dd) echo "단계: MTProxy(DD) 실행." ;;
         step_dns_check) echo "단계: 접속 도메인 DNS 확인." ;;
         step_summary) echo "완료. 아래에 설정과 가져오기 링크를 출력합니다." ;;
+        ask_mode) echo "배포 모드를 선택하세요:" ;;
+        mode_ee_only) echo "EE만 (FakeTLS / mtg)" ;;
+        mode_dd_only) echo "DD만 (padding / MTProxy)" ;;
+        mode_both) echo "EE + DD (이중 라인, 권장)" ;;
         ask_ee_domain) echo "EE 접속 도메인 입력(예: ee.example.com): " ;;
         ask_dd_domain) echo "DD 접속 도메인 입력(예: dd.example.com): " ;;
         ask_front_domain) echo "EE 프론팅 도메인 입력(기본: www.cloudflare.com): " ;;
@@ -149,6 +165,7 @@ t() {
         err_port_conflict) echo "같은 IP에서 EE와 DD는 동일 포트를 사용할 수 없습니다." ;;
         err_port_in_use) echo "해당 포트가 이미 사용 중입니다." ;;
         err_empty) echo "빈 값은 허용되지 않습니다." ;;
+        err_mode_invalid) echo "모드 입력이 잘못되었습니다. 1, 2, 3 중에서 선택하세요." ;;
         err_domain_invalid) echo "도메인 형식이 올바르지 않습니다. 예: sub.example.com" ;;
         warn_dns_unresolved) echo "경고: 도메인에 A 레코드가 없습니다." ;;
         warn_dns_mismatch) echo "경고: 도메인 A 레코드에 서버 IPv4가 없습니다." ;;
@@ -178,6 +195,10 @@ t() {
         step_run_dd) echo "手順：MTProxy（DD）起動。" ;;
         step_dns_check) echo "手順：接続ドメインのDNS確認。" ;;
         step_summary) echo "完了。設定とワンクリック導入リンクを表示します。" ;;
+        ask_mode) echo "デプロイモードを選択してください:" ;;
+        mode_ee_only) echo "EEのみ (FakeTLS / mtg)" ;;
+        mode_dd_only) echo "DDのみ (padding / MTProxy)" ;;
+        mode_both) echo "EE + DD（デュアル運用、推奨）" ;;
         ask_ee_domain) echo "EEの接続ドメイン（例：ee.example.com）: " ;;
         ask_dd_domain) echo "DDの接続ドメイン（例：dd.example.com）: " ;;
         ask_front_domain) echo "EEのfrontingドメイン（既定：www.cloudflare.com）: " ;;
@@ -189,6 +210,7 @@ t() {
         err_port_conflict) echo "同一IPではEEとDDを同じポートにできません。" ;;
         err_port_in_use) echo "そのポートは既に使用中です。" ;;
         err_empty) echo "空欄は不可です。" ;;
+        err_mode_invalid) echo "モード入力が不正です。1、2、3から選択してください。" ;;
         err_domain_invalid) echo "ドメイン形式が不正です。例: sub.example.com" ;;
         warn_dns_unresolved) echo "警告：ドメインにAレコードがありません。" ;;
         warn_dns_mismatch) echo "警告：ドメインAレコードにこのサーバーIPv4がありません。" ;;
@@ -269,6 +291,38 @@ ask_port() {
   done
 }
 
+ask_deploy_mode() {
+  local mode=""
+  while true; do
+    echo "$(t ask_mode)"
+    echo "1) $(t mode_ee_only)"
+    echo "2) $(t mode_dd_only)"
+    echo "3) $(t mode_both)"
+    read -rp "> " mode
+    mode="${mode// /}"
+    case "$mode" in
+      1)
+        DEPLOY_EE=1
+        DEPLOY_DD=0
+        return 0
+        ;;
+      2)
+        DEPLOY_EE=0
+        DEPLOY_DD=1
+        return 0
+        ;;
+      3)
+        DEPLOY_EE=1
+        DEPLOY_DD=1
+        return 0
+        ;;
+      *)
+        echo "$(t err_mode_invalid)"
+        ;;
+    esac
+  done
+}
+
 confirm_continue() {
   local ans=""
   echo -n "$(t ask_continue_anyway)"
@@ -326,12 +380,12 @@ is_valid_digest_image_ref() {
 }
 
 validate_image_refs() {
-  if ! is_valid_digest_image_ref "$MTG_IMAGE"; then
+  if [[ "$DEPLOY_EE" -eq 1 ]] && ! is_valid_digest_image_ref "$MTG_IMAGE"; then
     echo "$(t err_image_ref_invalid)"
     echo "MTG_IMAGE=${MTG_IMAGE}"
     exit 1
   fi
-  if ! is_valid_digest_image_ref "$DD_IMAGE"; then
+  if [[ "$DEPLOY_DD" -eq 1 ]] && ! is_valid_digest_image_ref "$DD_IMAGE"; then
     echo "$(t err_image_ref_invalid)"
     echo "DD_IMAGE=${DD_IMAGE}"
     exit 1
@@ -349,23 +403,39 @@ echo "$(t note_no_cdn)"
 echo
 
 # Inputs
-ask_domain ask_ee_domain EE_DOMAIN
-ask_domain ask_dd_domain DD_DOMAIN
+ask_deploy_mode
 
-echo -n "$(t ask_front_domain)"
-read -r FRONT_DOMAIN
-FRONT_DOMAIN="${FRONT_DOMAIN:-www.cloudflare.com}"
-FRONT_DOMAIN="${FRONT_DOMAIN//[[:space:]]/}"
-FRONT_DOMAIN="${FRONT_DOMAIN,,}"
-if ! is_valid_domain "$FRONT_DOMAIN"; then
-  echo "$(t err_domain_invalid)"
-  exit 1
+EE_DOMAIN=""
+DD_DOMAIN=""
+FRONT_DOMAIN=""
+EE_PORT=""
+DD_PORT=""
+EE_SECRET=""
+DD_BASE_SECRET=""
+DD_SECRET=""
+
+if [[ "$DEPLOY_EE" -eq 1 ]]; then
+  ask_domain ask_ee_domain EE_DOMAIN
+
+  echo -n "$(t ask_front_domain)"
+  read -r FRONT_DOMAIN
+  FRONT_DOMAIN="${FRONT_DOMAIN:-www.cloudflare.com}"
+  FRONT_DOMAIN="${FRONT_DOMAIN//[[:space:]]/}"
+  FRONT_DOMAIN="${FRONT_DOMAIN,,}"
+  if ! is_valid_domain "$FRONT_DOMAIN"; then
+    echo "$(t err_domain_invalid)"
+    exit 1
+  fi
+
+  ask_port ask_ee_port EE_PORT
 fi
 
-ask_port ask_ee_port EE_PORT
-ask_port ask_dd_port DD_PORT
+if [[ "$DEPLOY_DD" -eq 1 ]]; then
+  ask_domain ask_dd_domain DD_DOMAIN
+  ask_port ask_dd_port DD_PORT
+fi
 
-if [[ "$EE_PORT" == "$DD_PORT" ]]; then
+if [[ "$DEPLOY_EE" -eq 1 && "$DEPLOY_DD" -eq 1 && "$EE_PORT" == "$DD_PORT" ]]; then
   echo "$(t err_port_conflict)"
   exit 1
 fi
@@ -384,8 +454,12 @@ apt-get install -y ca-certificates curl gnupg lsb-release ufw openssl jq dnsutil
 echo
 echo "$(t step_dns_check)"
 SERVER_IPV4="$(get_primary_ipv4)"
-check_domain_dns "$EE_DOMAIN" "$SERVER_IPV4"
-check_domain_dns "$DD_DOMAIN" "$SERVER_IPV4"
+if [[ "$DEPLOY_EE" -eq 1 ]]; then
+  check_domain_dns "$EE_DOMAIN" "$SERVER_IPV4"
+fi
+if [[ "$DEPLOY_DD" -eq 1 ]]; then
+  check_domain_dns "$DD_DOMAIN" "$SERVER_IPV4"
+fi
 
 # Step: Docker
 echo
@@ -420,8 +494,12 @@ while read -r ssh_port; do
   [[ -n "$ssh_port" ]] || continue
   ufw allow "${ssh_port}/tcp" >/dev/null
 done < <(collect_sshd_ports)
-ufw allow "${EE_PORT}/tcp" >/dev/null
-ufw allow "${DD_PORT}/tcp" >/dev/null
+if [[ "$DEPLOY_EE" -eq 1 ]]; then
+  ufw allow "${EE_PORT}/tcp" >/dev/null
+fi
+if [[ "$DEPLOY_DD" -eq 1 ]]; then
+  ufw allow "${DD_PORT}/tcp" >/dev/null
+fi
 if ufw status | grep -qi inactive; then
   ufw --force enable >/dev/null
 fi
@@ -431,57 +509,65 @@ ufw reload >/dev/null
 validate_image_refs
 echo
 echo "$(t step_pull)"
-docker pull "$MTG_IMAGE" >/dev/null
-docker pull "$DD_IMAGE" >/dev/null
-
-# Step: Test TLS to fronting
-echo
-echo "$(t step_front_test) (${FRONT_DOMAIN})"
-if timeout 6 openssl s_client -connect "${FRONT_DOMAIN}:443" -servername "${FRONT_DOMAIN}" </dev/null >/dev/null 2>&1; then
-  echo "$(t tls_ok)"
-else
-  echo "$(t tls_fail)"
-  if ! confirm_continue; then
-    echo "$(t tls_abort)"
-    exit 1
-  fi
+if [[ "$DEPLOY_EE" -eq 1 ]]; then
+  docker pull "$MTG_IMAGE" >/dev/null
+fi
+if [[ "$DEPLOY_DD" -eq 1 ]]; then
+  docker pull "$DD_IMAGE" >/dev/null
 fi
 
-# Step: Generate EE secret & config
-echo
-echo "$(t step_gen_ee)"
-EE_SECRET="$(docker run --rm "$MTG_IMAGE" generate-secret --hex "$FRONT_DOMAIN" | tr -d '\r\n')"
-mkdir -p /opt/mtg
-cat >/opt/mtg/config.toml <<EOF
+if [[ "$DEPLOY_EE" -eq 1 ]]; then
+  # Step: Test TLS to fronting
+  echo
+  echo "$(t step_front_test) (${FRONT_DOMAIN})"
+  if timeout 6 openssl s_client -connect "${FRONT_DOMAIN}:443" -servername "${FRONT_DOMAIN}" </dev/null >/dev/null 2>&1; then
+    echo "$(t tls_ok)"
+  else
+    echo "$(t tls_fail)"
+    if ! confirm_continue; then
+      echo "$(t tls_abort)"
+      exit 1
+    fi
+  fi
+
+  # Step: Generate EE secret & config
+  echo
+  echo "$(t step_gen_ee)"
+  EE_SECRET="$(docker run --rm "$MTG_IMAGE" generate-secret --hex "$FRONT_DOMAIN" | tr -d '\r\n')"
+  mkdir -p /opt/mtg
+  cat >/opt/mtg/config.toml <<EOF
 secret = "$EE_SECRET"
 bind-to = "0.0.0.0:3128"
 EOF
 
-# Step: Run EE
-echo
-echo "$(t step_run_ee) (port ${EE_PORT})"
-docker rm -f mtg-ee >/dev/null 2>&1 || true
-docker run -d --name mtg-ee \
-  --restart unless-stopped \
-  -v /opt/mtg/config.toml:/config.toml \
-  -p "${EE_PORT}:3128" \
-  "$MTG_IMAGE" >/dev/null
+  # Step: Run EE
+  echo
+  echo "$(t step_run_ee) (port ${EE_PORT})"
+  docker rm -f mtg-ee >/dev/null 2>&1 || true
+  docker run -d --name mtg-ee \
+    --restart unless-stopped \
+    -v /opt/mtg/config.toml:/config.toml \
+    -p "${EE_PORT}:3128" \
+    "$MTG_IMAGE" >/dev/null
+fi
 
-# Step: Generate DD secret
-echo
-echo "$(t step_gen_dd)"
-DD_BASE_SECRET="$(openssl rand -hex 16)"
-DD_SECRET="dd${DD_BASE_SECRET}"
+if [[ "$DEPLOY_DD" -eq 1 ]]; then
+  # Step: Generate DD secret
+  echo
+  echo "$(t step_gen_dd)"
+  DD_BASE_SECRET="$(openssl rand -hex 16)"
+  DD_SECRET="dd${DD_BASE_SECRET}"
 
-# Step: Run DD
-echo
-echo "$(t step_run_dd) (port ${DD_PORT})"
-docker rm -f mtproto-dd >/dev/null 2>&1 || true
-docker run -d --name mtproto-dd \
-  --restart unless-stopped \
-  -p "${DD_PORT}:443" \
-  -e SECRET="${DD_BASE_SECRET}" \
-  "$DD_IMAGE" >/dev/null
+  # Step: Run DD
+  echo
+  echo "$(t step_run_dd) (port ${DD_PORT})"
+  docker rm -f mtproto-dd >/dev/null 2>&1 || true
+  docker run -d --name mtproto-dd \
+    --restart unless-stopped \
+    -p "${DD_PORT}:443" \
+    -e SECRET="${DD_BASE_SECRET}" \
+    "$DD_IMAGE" >/dev/null
+fi
 
 # Summary
 echo
@@ -490,23 +576,31 @@ echo "$(t note_secret)"
 echo
 
 echo "Images       :"
-echo "MTG          : ${MTG_IMAGE}"
-echo "DD           : ${DD_IMAGE}"
+if [[ "$DEPLOY_EE" -eq 1 ]]; then
+  echo "MTG          : ${MTG_IMAGE}"
+fi
+if [[ "$DEPLOY_DD" -eq 1 ]]; then
+  echo "DD           : ${DD_IMAGE}"
+fi
 echo
 
-echo "================= EE (FakeTLS / mtg) ================="
-echo "Entry domain : ${EE_DOMAIN}"
-echo "Port         : ${EE_PORT}"
-echo "Fronting     : ${FRONT_DOMAIN}"
-echo "Secret (EE)  : ${EE_SECRET}"
-echo "Import link  : tg://proxy?server=${EE_DOMAIN}&port=${EE_PORT}&secret=${EE_SECRET}"
-echo
-echo "================= DD (padding / MTProxy) ============="
-echo "Entry domain : ${DD_DOMAIN}"
-echo "Port         : ${DD_PORT}"
-echo "Secret (DD)  : ${DD_SECRET}"
-echo "Import link  : tg://proxy?server=${DD_DOMAIN}&port=${DD_PORT}&secret=${DD_SECRET}"
-echo
+if [[ "$DEPLOY_EE" -eq 1 ]]; then
+  echo "================= EE (FakeTLS / mtg) ================="
+  echo "Entry domain : ${EE_DOMAIN}"
+  echo "Port         : ${EE_PORT}"
+  echo "Fronting     : ${FRONT_DOMAIN}"
+  echo "Secret (EE)  : ${EE_SECRET}"
+  echo "Import link  : tg://proxy?server=${EE_DOMAIN}&port=${EE_PORT}&secret=${EE_SECRET}"
+  echo
+fi
+if [[ "$DEPLOY_DD" -eq 1 ]]; then
+  echo "================= DD (padding / MTProxy) ============="
+  echo "Entry domain : ${DD_DOMAIN}"
+  echo "Port         : ${DD_PORT}"
+  echo "Secret (DD)  : ${DD_SECRET}"
+  echo "Import link  : tg://proxy?server=${DD_DOMAIN}&port=${DD_PORT}&secret=${DD_SECRET}"
+  echo
+fi
 echo "Docker status:"
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}'
 echo

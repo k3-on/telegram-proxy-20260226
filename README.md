@@ -15,6 +15,7 @@ This repository provides an interactive one-click installer script for Telegram 
 
 ### Features
 - Interactive setup (domain, ports, BBR)
+- Deployment mode selection: EE only / DD only / EE+DD
 - i18n prompts (EN/ZH/KO/JA)
 - Safer UFW order (allow first, then enable)
 - TLS precheck for fronting domain
@@ -60,6 +61,7 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 
 ### 功能
 - 交互式安装（域名、端口、BBR）
+- 部署模式可选：仅 EE / 仅 DD / EE+DD
 - 四语提示（中英韩日）
 - 更安全的 UFW 顺序（先放行再启用）
 - fronting 域名 TLS 预检查
@@ -105,6 +107,7 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 
 ### 기능
 - 대화형 설치(도메인, 포트, BBR)
+- 배포 모드 선택 지원: EE만 / DD만 / EE+DD
 - 4개 언어 안내(EN/ZH/KO/JA)
 - 안전한 UFW 순서(허용 후 활성화)
 - fronting 도메인 TLS 사전 점검
@@ -142,6 +145,7 @@ sudo -E bash install.sh
 
 ### 機能
 - 対話式インストール（ドメイン、ポート、BBR）
+- デプロイモード選択対応：EEのみ / DDのみ / EE+DD
 - 4言語表示（英語/中国語/韓国語/日本語）
 - 安全なUFW手順（許可してから有効化）
 - frontingドメインのTLS事前確認
