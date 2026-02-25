@@ -1,14 +1,16 @@
 # Telegram MTProto Proxy Installer (EE + DD)
 
-English | 中文 | 한국어 | 日本語
+[![English](https://img.shields.io/badge/English-1f6feb?style=for-the-badge)](#english) [![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-238636?style=for-the-badge)](#chinese) [![한국어](https://img.shields.io/badge/%ED%95%9C%EA%B5%AD%EC%96%B4-f85149?style=for-the-badge)](#korean) [![日本語](https://img.shields.io/badge/%E6%97%A5%E6%9C%AC%E8%AA%9E-a371f7?style=for-the-badge)](#japanese)
 
 This repository provides an interactive one-click installer script for Telegram MTProto proxy deployment on Ubuntu 22.04.
 
-- Script: `/Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh`
+- Repository: `https://github.com/k3-on/telegram-proxy-20260226`
+- Script: `install.sh`
 - Modes:
   - EE (FakeTLS) via `nineseconds/mtg`
   - DD (padding) via `telegrammessenger/proxy`
 
+<a id="english"></a>
 ## English
 
 ### Features
@@ -26,7 +28,9 @@ This repository provides an interactive one-click installer script for Telegram 
 
 ### Quick Start
 ```bash
-sudo bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
+git clone https://github.com/k3-on/telegram-proxy-20260226.git
+cd telegram-proxy-20260226
+sudo bash install.sh
 ```
 
 ### Reproducible Deployment with Pinned Digests
@@ -40,7 +44,7 @@ Set real digests before running:
 ```bash
 export MTG_IMAGE='nineseconds/mtg@sha256:<64-hex-digest>'
 export DD_IMAGE='telegrammessenger/proxy@sha256:<64-hex-digest>'
-sudo -E bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
+sudo -E bash install.sh
 ```
 
 Example way to fetch digests in a networked environment:
@@ -51,6 +55,7 @@ docker image inspect nineseconds/mtg:2 --format '{{index .RepoDigests 0}}'
 docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDigests 0}}'
 ```
 
+<a id="chinese"></a>
 ## 中文
 
 ### 功能
@@ -68,7 +73,9 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 
 ### 快速使用
 ```bash
-sudo bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
+git clone https://github.com/k3-on/telegram-proxy-20260226.git
+cd telegram-proxy-20260226
+sudo bash install.sh
 ```
 
 ### 固定 digest（可复现部署）
@@ -82,7 +89,7 @@ sudo bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
 ```bash
 export MTG_IMAGE='nineseconds/mtg@sha256:<64位十六进制digest>'
 export DD_IMAGE='telegrammessenger/proxy@sha256:<64位十六进制digest>'
-sudo -E bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
+sudo -E bash install.sh
 ```
 
 联网环境下可参考：
@@ -93,6 +100,7 @@ docker image inspect nineseconds/mtg:2 --format '{{index .RepoDigests 0}}'
 docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDigests 0}}'
 ```
 
+<a id="korean"></a>
 ## 한국어
 
 ### 기능
@@ -110,7 +118,9 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 
 ### 빠른 실행
 ```bash
-sudo bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
+git clone https://github.com/k3-on/telegram-proxy-20260226.git
+cd telegram-proxy-20260226
+sudo bash install.sh
 ```
 
 ### digest 고정 사용
@@ -124,9 +134,10 @@ sudo bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
 ```bash
 export MTG_IMAGE='nineseconds/mtg@sha256:<64-hex-digest>'
 export DD_IMAGE='telegrammessenger/proxy@sha256:<64-hex-digest>'
-sudo -E bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
+sudo -E bash install.sh
 ```
 
+<a id="japanese"></a>
 ## 日本語
 
 ### 機能
@@ -144,7 +155,9 @@ sudo -E bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
 
 ### クイックスタート
 ```bash
-sudo bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
+git clone https://github.com/k3-on/telegram-proxy-20260226.git
+cd telegram-proxy-20260226
+sudo bash install.sh
 ```
 
 ### digest固定
@@ -158,5 +171,5 @@ sudo bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
 ```bash
 export MTG_IMAGE='nineseconds/mtg@sha256:<64-hex-digest>'
 export DD_IMAGE='telegrammessenger/proxy@sha256:<64-hex-digest>'
-sudo -E bash /Users/keons/Documents/GitHub/telegram-proxy-20260226/install.sh
+sudo -E bash install.sh
 ```
