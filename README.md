@@ -18,6 +18,7 @@ This repository provides an interactive one-click installer script for Telegram 
 - Deployment mode selection: EE only / DD only / EE+DD
 - Port presets + manual input
 - Port conflict check for user-selected ports with optional old-proxy cleanup
+- Fronting domain presets + single manual input
 - i18n prompts (EN/ZH/KO/JA)
 - Safer UFW order (allow first, then enable)
 - TLS precheck for fronting domain
@@ -66,6 +67,7 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 - 部署模式可选：仅 EE / 仅 DD / EE+DD
 - 端口支持预设选项 + 手动输入
 - 用户自选端口冲突检测，并可选清理旧代理容器
+- Fronting 域名支持预设选项 + 单个手动输入
 - 四语提示（中英韩日）
 - 更安全的 UFW 顺序（先放行再启用）
 - fronting 域名 TLS 预检查
@@ -114,6 +116,7 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 - 배포 모드 선택 지원: EE만 / DD만 / EE+DD
 - 포트 프리셋 + 수동 입력 지원
 - 사용자가 선택한 포트 충돌 감지 및 기존 프록시 컨테이너 선택 정리
+- Fronting 도메인 프리셋 + 단일 수동 입력 지원
 - 4개 언어 안내(EN/ZH/KO/JA)
 - 안전한 UFW 순서(허용 후 활성화)
 - fronting 도메인 TLS 사전 점검
@@ -154,6 +157,7 @@ sudo -E bash install.sh
 - デプロイモード選択対応：EEのみ / DDのみ / EE+DD
 - ポートはプリセット選択 + 手動入力に対応
 - ユーザー指定ポートの競合検出と旧プロキシコンテナの任意クリーンアップ
+- frontingドメインはプリセット + 単一手動入力に対応
 - 4言語表示（英語/中国語/韓国語/日本語）
 - 安全なUFW手順（許可してから有効化）
 - frontingドメインのTLS事前確認

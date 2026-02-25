@@ -21,6 +21,7 @@ MTG_IMAGE="${MTG_IMAGE:-nineseconds/mtg@sha256:f0e90be754c59e729bc4e219eeb210a60
 DD_IMAGE="${DD_IMAGE:-telegrammessenger/proxy@sha256:73210d43c8f8e4c888ba4e30d6daf7742528e9134252a1cd538caabf5e24a597}"
 DEPLOY_EE=0
 DEPLOY_DD=0
+FRONT_DOMAINS=()
 
 # ---------- i18n ----------
 UI_LANG="en"
@@ -67,6 +68,7 @@ t() {
         ask_ee_domain) echo "Enter entry domain for EE (example: ee.example.com): " ;;
         ask_dd_domain) echo "Enter entry domain for DD (example: dd.example.com): " ;;
         ask_front_domain) echo "Enter fronting domain for EE (default: www.cloudflare.com): " ;;
+        ask_fronting_mode) echo "Choose fronting domain input mode:" ;;
         ask_ee_port) echo "Choose port for EE (recommended: 443). Enter a number: " ;;
         ask_dd_port) echo "Choose port for DD (recommended: 8443). Enter a number: " ;;
         ask_port_menu) echo "Choose a port option:" ;;
@@ -94,6 +96,7 @@ t() {
         tls_ok) echo "TLS handshake OK." ;;
         tls_fail) echo "TLS handshake FAILED or timed out. FakeTLS may be unstable with this fronting domain." ;;
         tls_abort) echo "Aborted because TLS check failed and user did not confirm continuation." ;;
+        warn_front_fallback) echo "No fronting candidate passed TLS check. Falling back to the first candidate:" ;;
         note_secret) echo "Do NOT share secrets publicly. Anyone with the secret can use your proxy." ;;
         note_no_cdn) echo "Important: DNS should be 'DNS only' (no CDN proxy). MTProto is not standard HTTPS." ;;
         err_image_ref_invalid) echo "Image reference must be digest format: name@sha256:64hex. Please set MTG_IMAGE/DD_IMAGE." ;;
@@ -122,6 +125,7 @@ t() {
         ask_ee_domain) echo "请输入 EE 入口域名（例如：ee.example.com）： " ;;
         ask_dd_domain) echo "请输入 DD 入口域名（例如：dd.example.com）： " ;;
         ask_front_domain) echo "请输入 EE 的 fronting 域名（默认：www.cloudflare.com）： " ;;
+        ask_fronting_mode) echo "请选择 fronting 域名输入方式：" ;;
         ask_ee_port) echo "请选择 EE 端口（推荐 443）。请输入端口号： " ;;
         ask_dd_port) echo "请选择 DD 端口（推荐 8443）。请输入端口号： " ;;
         ask_port_menu) echo "请选择端口选项：" ;;
@@ -149,6 +153,7 @@ t() {
         tls_ok) echo "TLS 握手正常。" ;;
         tls_fail) echo "TLS 握手失败或超时。FakeTLS 可能不稳定，建议更换 fronting 域名。" ;;
         tls_abort) echo "由于 TLS 检测失败且未确认继续，脚本已中止。" ;;
+        warn_front_fallback) echo "所有候选 fronting 域名 TLS 检测都失败，将回退到第一个候选：" ;;
         note_secret) echo "不要公开分享 secret。任何拿到 secret 的人都能使用你的代理。" ;;
         note_no_cdn) echo "重要：DNS 必须是 DNS only/灰云（不要 CDN 代理）。MTProto 不是标准 HTTPS。" ;;
         err_image_ref_invalid) echo "镜像引用必须是 digest 格式：name@sha256:64位十六进制。请设置 MTG_IMAGE/DD_IMAGE。" ;;
@@ -177,6 +182,7 @@ t() {
         ask_ee_domain) echo "EE 접속 도메인 입력(예: ee.example.com): " ;;
         ask_dd_domain) echo "DD 접속 도메인 입력(예: dd.example.com): " ;;
         ask_front_domain) echo "EE 프론팅 도메인 입력(기본: www.cloudflare.com): " ;;
+        ask_fronting_mode) echo "프론팅 도메인 입력 방식을 선택하세요:" ;;
         ask_ee_port) echo "EE 포트 선택(권장: 443). 포트 번호 입력: " ;;
         ask_dd_port) echo "DD 포트 선택(권장: 8443). 포트 번호 입력: " ;;
         ask_port_menu) echo "포트 옵션을 선택하세요:" ;;
@@ -204,6 +210,7 @@ t() {
         tls_ok) echo "TLS 핸드셰이크 OK." ;;
         tls_fail) echo "TLS 핸드셰이크 실패/타임아웃." ;;
         tls_abort) echo "TLS 검사 실패 후 계속 확인이 없어 중단합니다." ;;
+        warn_front_fallback) echo "모든 프론팅 후보의 TLS 검사에 실패했습니다. 첫 번째 후보로 진행합니다:" ;;
         note_secret) echo "시크릿을 공개 공유하지 마세요." ;;
         note_no_cdn) echo "중요: DNS only(프록시/CDN 금지)." ;;
         err_image_ref_invalid) echo "이미지 참조는 digest 형식(name@sha256:64hex)이어야 합니다. MTG_IMAGE/DD_IMAGE를 설정하세요." ;;
@@ -232,6 +239,7 @@ t() {
         ask_ee_domain) echo "EEの接続ドメイン（例：ee.example.com）: " ;;
         ask_dd_domain) echo "DDの接続ドメイン（例：dd.example.com）: " ;;
         ask_front_domain) echo "EEのfrontingドメイン（既定：www.cloudflare.com）: " ;;
+        ask_fronting_mode) echo "frontingドメインの入力方式を選択してください:" ;;
         ask_ee_port) echo "EEのポート（推奨: 443）。番号を入力: " ;;
         ask_dd_port) echo "DDのポート（推奨: 8443）。番号を入力: " ;;
         ask_port_menu) echo "ポートオプションを選択してください:" ;;
@@ -259,6 +267,7 @@ t() {
         tls_ok) echo "TLSハンドシェイクOK。" ;;
         tls_fail) echo "TLSハンドシェイク失敗/タイムアウト。" ;;
         tls_abort) echo "TLS確認失敗かつ続行確認なしのため中止しました。" ;;
+        warn_front_fallback) echo "全候補のTLS確認に失敗しました。先頭候補で続行します:" ;;
         note_secret) echo "シークレットを公開しないでください。" ;;
         note_no_cdn) echo "重要：DNSはDNS only（CDNプロキシ禁止）。" ;;
         err_image_ref_invalid) echo "イメージ参照はdigest形式(name@sha256:64hex)である必要があります。MTG_IMAGE/DD_IMAGEを設定してください。" ;;
@@ -338,6 +347,45 @@ ask_domain() {
     fi
     printf -v "$var_name" "%s" "$value"
     return 0
+  done
+}
+
+ask_front_domain_with_options() {
+  local choice=""
+  while true; do
+    echo "$(t ask_fronting_mode)"
+    echo "1) www.cloudflare.com ($(t opt_recommended))"
+    echo "2) www.google.com"
+    echo "3) www.microsoft.com"
+    echo "4) aws.amazon.com"
+    echo "5) $(t opt_manual_input)"
+    read -rp "> " choice
+    choice="${choice// /}"
+    case "$choice" in
+      1)
+        FRONT_DOMAIN="www.cloudflare.com"
+        return 0
+        ;;
+      2)
+        FRONT_DOMAIN="www.google.com"
+        return 0
+        ;;
+      3)
+        FRONT_DOMAIN="www.microsoft.com"
+        return 0
+        ;;
+      4)
+        FRONT_DOMAIN="aws.amazon.com"
+        return 0
+        ;;
+      5)
+        ask_domain ask_front_domain FRONT_DOMAIN
+        return 0
+        ;;
+      *)
+        echo "$(t err_choice_invalid)"
+        ;;
+    esac
   done
 }
 
@@ -557,15 +605,7 @@ DD_SECRET=""
 if [[ "$DEPLOY_EE" -eq 1 ]]; then
   ask_domain ask_ee_domain EE_DOMAIN
 
-  echo -n "$(t ask_front_domain)"
-  read -r FRONT_DOMAIN
-  FRONT_DOMAIN="${FRONT_DOMAIN:-www.cloudflare.com}"
-  FRONT_DOMAIN="${FRONT_DOMAIN//[[:space:]]/}"
-  FRONT_DOMAIN="${FRONT_DOMAIN,,}"
-  if ! is_valid_domain "$FRONT_DOMAIN"; then
-    echo "$(t err_domain_invalid)"
-    exit 1
-  fi
+  ask_front_domain_with_options
 
   ask_port_with_options ask_ee_port EE_PORT "443" "8443" "9443"
 fi
