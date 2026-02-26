@@ -599,7 +599,8 @@ Usage:
   install.sh rotate-secret --mode ee|dd [--secret SECRET] [--front-domain DOMAIN]
 
 Notes:
-  - Default command is 'install' (interactive).
+  - No arguments: open interactive menu.
+  - 'install' command: start interactive install flow directly.
   - rotate-secret for DD accepts either 32-hex or dd+32-hex.
 EOF
 }
@@ -1106,7 +1107,9 @@ command_install() {
   local EE_BIND_IP="0.0.0.0"
   local DD_BIND_IP="0.0.0.0"
 
-  select_language
+  if [[ "${SKIP_LANGUAGE_PROMPT:-0}" != "1" ]]; then
+    select_language
+  fi
   echo
   echo "============================================================"
   t title
@@ -1302,6 +1305,145 @@ EOF
   cmd_healthcheck || true
 }
 
+prompt_mode_all() {
+  local mode_choice=""
+  while true; do
+    echo "Select mode:"
+    echo "1) ee"
+    echo "2) dd"
+    echo "3) all"
+    read -rp "> " mode_choice
+    mode_choice="${mode_choice// /}"
+    case "$mode_choice" in
+      1)
+        echo "ee"
+        return 0
+        ;;
+      2)
+        echo "dd"
+        return 0
+        ;;
+      3)
+        echo "all"
+        return 0
+        ;;
+      *)
+        t err_choice_invalid
+        ;;
+    esac
+  done
+}
+
+prompt_mode_rotate() {
+  local mode_choice=""
+  while true; do
+    echo "Select rotate mode:"
+    echo "1) ee"
+    echo "2) dd"
+    read -rp "> " mode_choice
+    mode_choice="${mode_choice// /}"
+    case "$mode_choice" in
+      1)
+        echo "ee"
+        return 0
+        ;;
+      2)
+        echo "dd"
+        return 0
+        ;;
+      *)
+        t err_choice_invalid
+        ;;
+    esac
+  done
+}
+
+interactive_menu() {
+  local choice=""
+  local mode=""
+  local mtg_image_arg=""
+  local dd_image_arg=""
+  local rotate_mode=""
+  local rotate_secret=""
+  local rotate_front=""
+
+  select_language
+
+  while true; do
+    echo
+    echo "================ Main Menu ================"
+    echo "1) install"
+    echo "2) healthcheck"
+    echo "3) self-heal"
+    echo "4) upgrade"
+    echo "5) rotate-secret"
+    echo "6) uninstall"
+    echo "7) help"
+    echo "0) exit"
+    read -rp "> " choice
+    choice="${choice// /}"
+
+    case "$choice" in
+      1)
+        SKIP_LANGUAGE_PROMPT=1 command_install
+        ;;
+      2)
+        mode="$(prompt_mode_all)"
+        set_mode_flags "$mode" || continue
+        cmd_healthcheck || true
+        ;;
+      3)
+        mode="$(prompt_mode_all)"
+        set_mode_flags "$mode" || continue
+        cmd_self_heal || true
+        ;;
+      4)
+        mode="$(prompt_mode_all)"
+        set_mode_flags "$mode" || continue
+        mtg_image_arg=""
+        dd_image_arg=""
+        if [[ "$DEPLOY_EE" -eq 1 ]]; then
+          read -rp "Enter new MTG image digest (blank=keep current): " mtg_image_arg
+        fi
+        if [[ "$DEPLOY_DD" -eq 1 ]]; then
+          read -rp "Enter new DD image digest (blank=keep current): " dd_image_arg
+        fi
+        if cmd_upgrade "$mtg_image_arg" "$dd_image_arg"; then
+          cmd_healthcheck || true
+        fi
+        ;;
+      5)
+        rotate_mode="$(prompt_mode_rotate)"
+        read -rp "Enter new secret (blank=auto for EE): " rotate_secret
+        rotate_front=""
+        if [[ "$rotate_mode" == "ee" ]]; then
+          read -rp "Enter front-domain for EE auto secret (blank=keep current): " rotate_front
+        fi
+        if cmd_rotate_secret "$rotate_mode" "$rotate_secret" "$rotate_front"; then
+          set_mode_flags "$rotate_mode" || continue
+          cmd_healthcheck || true
+        fi
+        ;;
+      6)
+        mode="$(prompt_mode_all)"
+        set_mode_flags "$mode" || continue
+        if confirm_continue; then
+          cmd_uninstall
+        fi
+        ;;
+      7)
+        usage
+        ;;
+      0)
+        return 0
+        ;;
+      *)
+        t err_choice_invalid
+        ;;
+    esac
+  done
+}
+
 main() {
   local cmd="${1:-install}"
   local mode="all"
@@ -1310,6 +1452,11 @@ main() {
   local rotate_mode=""
   local rotate_secret=""
   local rotate_front=""
+
+  if [[ "$#" -eq 0 ]]; then
+    interactive_menu
+    return 0
+  fi
 
   case "$cmd" in
     install)
