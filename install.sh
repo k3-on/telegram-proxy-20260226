@@ -284,7 +284,7 @@ t() {
 
 # ---------- Utilities ----------
 is_port_number() {
-  [[ "$1" =~ ^[0-9]+$ ]] && (( "$1" >= 1 && "$1" <= 65535 ))
+  [[ "$1" =~ ^[0-9]+$ ]] && (("$1" >= 1 && "$1" <= 65535))
 }
 
 is_valid_domain() {
@@ -988,7 +988,10 @@ cmd_upgrade() {
   local current_dd_image=""
 
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
-    [[ -f "$EE_ENV_FILE" ]] || { echo "EE is not installed."; return 1; }
+    [[ -f "$EE_ENV_FILE" ]] || {
+      echo "EE is not installed."
+      return 1
+    }
     # shellcheck disable=SC1090
     source "$EE_ENV_FILE"
     current_mtg_image="${MTG_IMAGE:-}"
@@ -1003,7 +1006,10 @@ cmd_upgrade() {
   fi
 
   if [[ "$DEPLOY_DD" -eq 1 ]]; then
-    [[ -f "$DD_ENV_FILE" ]] || { echo "DD is not installed."; return 1; }
+    [[ -f "$DD_ENV_FILE" ]] || {
+      echo "DD is not installed."
+      return 1
+    }
     # shellcheck disable=SC1090
     source "$DD_ENV_FILE"
     current_dd_image="${DD_IMAGE:-}"
@@ -1040,7 +1046,10 @@ cmd_rotate_secret() {
 
   case "$mode" in
     ee)
-      [[ -f "$EE_ENV_FILE" ]] || { echo "EE is not installed."; return 1; }
+      [[ -f "$EE_ENV_FILE" ]] || {
+        echo "EE is not installed."
+        return 1
+      }
       # shellcheck disable=SC1090
       source "$EE_ENV_FILE"
       if [[ -z "$input_secret" ]]; then
@@ -1069,7 +1078,10 @@ EOF
       systemctl restart "$EE_SERVICE_NAME"
       ;;
     dd)
-      [[ -f "$DD_ENV_FILE" ]] || { echo "DD is not installed."; return 1; }
+      [[ -f "$DD_ENV_FILE" ]] || {
+        echo "DD is not installed."
+        return 1
+      }
       if [[ -z "$input_secret" ]]; then
         read -rp "Enter new DD secret (32-hex or dd+32-hex): " input_secret
       fi
@@ -1366,7 +1378,7 @@ main() {
       set_mode_flags "$mode" || exit 1
       cmd_healthcheck
       ;;
-    self-heal|self_heal)
+    self-heal | self_heal)
       shift || true
       while (($#)); do
         case "$1" in
@@ -1384,7 +1396,7 @@ main() {
       set_mode_flags "$mode" || exit 1
       cmd_self_heal
       ;;
-    rotate-secret|rotate_secret)
+    rotate-secret | rotate_secret)
       shift || true
       while (($#)); do
         case "$1" in
@@ -1415,7 +1427,7 @@ main() {
       set_mode_flags "$rotate_mode" || exit 1
       cmd_healthcheck
       ;;
-    -h|--help|help)
+    -h | --help | help)
       usage
       ;;
     *)
