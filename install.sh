@@ -346,11 +346,11 @@ ask_domain() {
     value="${value//[[:space:]]/}"
     value="${value,,}"
     if [[ -z "$value" ]]; then
-      echo "$(t err_empty)"
+      t err_empty
       continue
     fi
     if ! is_valid_domain "$value"; then
-      echo "$(t err_domain_invalid)"
+      t err_domain_invalid
       continue
     fi
     printf -v "$var_name" "%s" "$value"
@@ -361,7 +361,7 @@ ask_domain() {
 ask_front_domain_with_options() {
   local choice=""
   while true; do
-    echo "$(t ask_fronting_mode)"
+    t ask_fronting_mode
     echo "1) www.cloudflare.com ($(t opt_recommended))"
     echo "2) www.google.com"
     echo "3) www.microsoft.com"
@@ -391,7 +391,7 @@ ask_front_domain_with_options() {
         return 0
         ;;
       *)
-        echo "$(t err_choice_invalid)"
+        t err_choice_invalid
         ;;
     esac
   done
@@ -402,32 +402,32 @@ check_and_prepare_port() {
   local do_cleanup=""
 
   if ! is_port_number "$p"; then
-    echo "$(t err_port_num)"
+    t err_port_num
     return 1
   fi
 
   if port_in_use "$p"; then
-    echo "$(t warn_443_busy)"
-    echo "$(t note_port_holders)"
+    t warn_443_busy
+    t note_port_holders
     show_port_holders "$p" || true
     echo -n "$(t ask_cleanup_proxy_443)"
     read -r do_cleanup
     if [[ "$do_cleanup" =~ ^[Yy]$ ]]; then
       if cleanup_old_proxy_containers; then
-        echo "$(t note_cleanup_done)"
+        t note_cleanup_done
       else
-        echo "$(t warn_cleanup_unavailable)"
+        t warn_cleanup_unavailable
       fi
       if port_in_use "$p"; then
-        echo "$(t warn_443_still_busy)"
-        echo "$(t note_port_holders)"
+        t warn_443_still_busy
+        t note_port_holders
         show_port_holders "$p" || true
-        echo "$(t err_port_in_use)"
+        t err_port_in_use
         return 1
       fi
       return 0
     fi
-    echo "$(t err_port_in_use)"
+    t err_port_in_use
     return 1
   fi
 
@@ -459,7 +459,7 @@ ask_port_with_options() {
   local p=""
 
   while true; do
-    echo "$(t ask_port_menu)"
+    t ask_port_menu
     echo "1) ${opt1} ($(t opt_recommended))"
     echo "2) ${opt2}"
     echo "3) ${opt3}"
@@ -475,7 +475,7 @@ ask_port_with_options() {
         return 0
         ;;
       *)
-        echo "$(t err_choice_invalid)"
+        t err_choice_invalid
         continue
         ;;
     esac
@@ -490,7 +490,7 @@ ask_port_with_options() {
 ask_deploy_mode() {
   local mode=""
   while true; do
-    echo "$(t ask_mode)"
+    t ask_mode
     echo "1) $(t mode_ee_only)"
     echo "2) $(t mode_dd_only)"
     echo "3) $(t mode_both)"
@@ -513,7 +513,7 @@ ask_deploy_mode() {
         return 0
         ;;
       *)
-        echo "$(t err_mode_invalid)"
+        t err_mode_invalid
         ;;
     esac
   done
@@ -547,13 +547,13 @@ check_domain_dns() {
   records="$(resolve_domain_a_records "$domain" || true)"
 
   if [[ -z "$records" ]]; then
-    echo "$(t warn_dns_unresolved) (${domain})"
+    printf '%s (%s)\n' "$(t warn_dns_unresolved)" "${domain}"
     confirm_continue || return 1
     return 0
   fi
 
   if [[ -n "$server_ip" ]] && ! grep -qx "$server_ip" <<<"$records"; then
-    echo "$(t warn_dns_mismatch) (${domain})"
+    printf '%s (%s)\n' "$(t warn_dns_mismatch)" "${domain}"
     echo "A records: $(tr '\n' ' ' <<<"$records" | xargs)"
     echo "Server IP: ${server_ip}"
     confirm_continue || return 1
@@ -577,12 +577,12 @@ is_valid_digest_image_ref() {
 
 validate_image_refs() {
   if [[ "$DEPLOY_EE" -eq 1 ]] && ! is_valid_digest_image_ref "$MTG_IMAGE"; then
-    echo "$(t err_image_ref_invalid)"
+    t err_image_ref_invalid
     echo "MTG_IMAGE=${MTG_IMAGE}"
     exit 1
   fi
   if [[ "$DEPLOY_DD" -eq 1 ]] && ! is_valid_digest_image_ref "$DD_IMAGE"; then
-    echo "$(t err_image_ref_invalid)"
+    t err_image_ref_invalid
     echo "DD_IMAGE=${DD_IMAGE}"
     exit 1
   fi
@@ -687,7 +687,7 @@ ask_bind_ip_with_options() {
         return 0
         ;;
       *)
-        echo "$(t err_choice_invalid)"
+        t err_choice_invalid
         ;;
     esac
   done
@@ -1097,10 +1097,10 @@ command_install() {
   select_language
   echo
   echo "============================================================"
-  echo "$(t title)"
+  t title
   echo "============================================================"
-  echo "$(t need_dns)"
-  echo "$(t note_no_cdn)"
+  t need_dns
+  t note_no_cdn
   echo
 
   ask_deploy_mode
@@ -1130,7 +1130,7 @@ command_install() {
   fi
 
   if [[ "$DEPLOY_EE" -eq 1 && "$DEPLOY_DD" -eq 1 ]] && ports_conflict_for_bindings "$EE_PORT" "$EE_BIND_IP" "$DD_PORT" "$DD_BIND_IP"; then
-    echo "$(t err_port_conflict)"
+    t err_port_conflict
     exit 1
   fi
 
@@ -1141,12 +1141,12 @@ command_install() {
   preflight_checks
 
   echo
-  echo "$(t step_update)"
+  t step_update
   apt-get update -y
   apt-get install -y ca-certificates curl gnupg lsb-release ufw openssl jq dnsutils iproute2
 
   echo
-  echo "$(t step_dns_check)"
+  t step_dns_check
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
     check_domain_dns "$EE_DOMAIN" "$SERVER_IPV4"
   fi
@@ -1155,7 +1155,7 @@ command_install() {
   fi
 
   echo
-  echo "$(t step_docker)"
+  t step_docker
   if ! command -v docker >/dev/null 2>&1; then
     apt-get install -y docker.io
   fi
@@ -1163,22 +1163,22 @@ command_install() {
 
   if [[ "$ENABLE_BBR" =~ ^[Yy]$ ]]; then
     echo
-    echo "$(t step_bbr_q)"
+    t step_bbr_q
     if sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | grep -qw bbr; then
       cat >/etc/sysctl.d/99-bbr.conf <<'EOF'
 net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 EOF
       if ! sysctl --system >/dev/null 2>&1; then
-        echo "$(t warn_bbr_apply_fail)"
+        t warn_bbr_apply_fail
       fi
     else
-      echo "$(t warn_bbr_unsupported)"
+      t warn_bbr_unsupported
     fi
   fi
 
   echo
-  echo "$(t step_firewall)"
+  t step_firewall
   ufw allow OpenSSH >/dev/null 2>&1 || true
   while read -r ssh_port; do
     [[ -n "$ssh_port" ]] || continue
@@ -1197,7 +1197,7 @@ EOF
 
   validate_image_refs
   echo
-  echo "$(t step_pull)"
+  t step_pull
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
     docker pull "$MTG_IMAGE" >/dev/null
   fi
@@ -1207,13 +1207,13 @@ EOF
 
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
     echo
-    echo "$(t step_front_test) (${FRONT_DOMAIN})"
+    printf '%s (%s)\n' "$(t step_front_test)" "${FRONT_DOMAIN}"
     if timeout 6 openssl s_client -connect "${FRONT_DOMAIN}:443" -servername "${FRONT_DOMAIN}" </dev/null >/dev/null 2>&1; then
-      echo "$(t tls_ok)"
+      t tls_ok
     else
-      echo "$(t tls_fail)"
+      t tls_fail
       if ! confirm_continue; then
-        echo "$(t tls_abort)"
+        t tls_abort
         exit 1
       fi
     fi
@@ -1224,7 +1224,7 @@ EOF
 
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
     echo
-    echo "$(t step_gen_ee)"
+    t step_gen_ee
     EE_SECRET="$(docker run --rm "$MTG_IMAGE" generate-secret --hex "$FRONT_DOMAIN" | tr -d '\r\n')"
     cat >/opt/mtg/config.toml <<EOF
 secret = "$EE_SECRET"
@@ -1236,7 +1236,7 @@ EOF
 
   if [[ "$DEPLOY_DD" -eq 1 ]]; then
     echo
-    echo "$(t step_gen_dd)"
+    t step_gen_dd
     DD_BASE_SECRET="$(openssl rand -hex 16)"
     DD_SECRET="dd${DD_BASE_SECRET}"
     write_dd_env_file
@@ -1246,18 +1246,18 @@ EOF
   systemd_reload
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
     echo
-    echo "$(t step_run_ee) (port ${EE_PORT})"
+    printf '%s (port %s)\n' "$(t step_run_ee)" "${EE_PORT}"
     systemctl enable --now "$EE_SERVICE_NAME"
   fi
   if [[ "$DEPLOY_DD" -eq 1 ]]; then
     echo
-    echo "$(t step_run_dd) (port ${DD_PORT})"
+    printf '%s (port %s)\n' "$(t step_run_dd)" "${DD_PORT}"
     systemctl enable --now "$DD_SERVICE_NAME"
   fi
 
   echo
-  echo "$(t step_summary)"
-  echo "$(t note_secret)"
+  t step_summary
+  t note_secret
   echo
   echo "Images       :"
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
