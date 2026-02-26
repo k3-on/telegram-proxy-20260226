@@ -12,13 +12,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install tools
+      - name: Setup shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+
+      - name: Setup shfmt
+        uses: mfinelli/setup-shfmt@v3
+
+      - name: Show versions
         run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck shfmt
+          shellcheck --version
+          shfmt --version
 
       - name: Run shellcheck
-        run: shellcheck install.sh
+        run: shellcheck -x install.sh
 
       - name: Run shfmt check
         run: shfmt -d -i 2 -ci -bn install.sh

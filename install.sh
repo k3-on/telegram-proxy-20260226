@@ -314,6 +314,7 @@ show_port_holders() {
 
 cleanup_old_proxy_containers() {
   local ids named_ids image_ids
+  local -a id_arr=()
   if ! command -v docker >/dev/null 2>&1; then
     return 1
   fi
@@ -329,7 +330,8 @@ cleanup_old_proxy_containers() {
   ids="$(printf '%s\n%s\n' "$named_ids" "$image_ids" | awk 'NF' | sort -u)"
 
   if [[ -n "$ids" ]]; then
-    docker rm -f $ids >/dev/null 2>&1 || true
+    mapfile -t id_arr < <(printf '%s\n' "$ids" | awk 'NF')
+    docker rm -f "${id_arr[@]}" >/dev/null 2>&1 || true
   fi
   return 0
 }
@@ -622,16 +624,6 @@ set_mode_flags() {
       return 1
       ;;
   esac
-}
-
-selected_mode_name() {
-  if [[ "$DEPLOY_EE" -eq 1 && "$DEPLOY_DD" -eq 1 ]]; then
-    echo "all"
-  elif [[ "$DEPLOY_EE" -eq 1 ]]; then
-    echo "ee"
-  else
-    echo "dd"
-  fi
 }
 
 is_valid_ipv4() {
