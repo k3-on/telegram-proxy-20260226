@@ -833,7 +833,7 @@ Restart=always
 RestartSec=5
 EnvironmentFile=-/etc/telegram-proxy/dd.env
 ExecStartPre=-/usr/bin/docker rm -f mtproto-dd
-ExecStart=/usr/bin/docker run --name mtproto-dd --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=256 -p ${DD_BIND_IP}:${DD_PORT}:443 -e SECRET=${DD_BASE_SECRET} ${DD_IMAGE}
+ExecStart=/usr/bin/docker run --name mtproto-dd --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=256 -p ${DD_BIND_IP}:${DD_PORT}:443 -e SECRET=${DD_SECRET} ${DD_IMAGE}
 ExecStop=/usr/bin/docker stop -t 10 mtproto-dd
 ExecStopPost=-/usr/bin/docker rm -f mtproto-dd
 
@@ -1003,6 +1003,8 @@ cmd_upgrade() {
     fi
     upsert_env_key "$EE_ENV_FILE" "MTG_IMAGE" "$mtg_new_image"
     docker pull "$mtg_new_image"
+    write_ee_systemd_unit
+    systemd_reload
     systemctl restart "$EE_SERVICE_NAME"
   fi
 
@@ -1021,6 +1023,8 @@ cmd_upgrade() {
     fi
     upsert_env_key "$DD_ENV_FILE" "DD_IMAGE" "$dd_new_image"
     docker pull "$dd_new_image"
+    write_dd_systemd_unit
+    systemd_reload
     systemctl restart "$DD_SERVICE_NAME"
   fi
 }
@@ -1071,11 +1075,16 @@ cmd_rotate_secret() {
       fi
       EE_SECRET="${input_secret,,}"
       mkdir -p /opt/mtg
+      chmod 700 /opt/mtg
+      umask 077
       cat >/opt/mtg/config.toml <<EOF
 secret = "$EE_SECRET"
 bind-to = "0.0.0.0:3128"
 EOF
+      chmod 600 /opt/mtg/config.toml
       upsert_env_key "$EE_ENV_FILE" "EE_SECRET" "$EE_SECRET"
+      write_ee_systemd_unit
+      systemd_reload
       systemctl restart "$EE_SERVICE_NAME"
       ;;
     dd)
@@ -1092,6 +1101,11 @@ EOF
       fi
       upsert_env_key "$DD_ENV_FILE" "DD_BASE_SECRET" "$DD_BASE_SECRET"
       upsert_env_key "$DD_ENV_FILE" "DD_SECRET" "$DD_SECRET"
+      # Re-write unit so legacy installs that used DD_BASE_SECRET switch to DD_SECRET.
+      # shellcheck disable=SC1090
+      source "$DD_ENV_FILE"
+      write_dd_systemd_unit
+      systemd_reload
       systemctl restart "$DD_SERVICE_NAME"
       ;;
     *)
@@ -1236,15 +1250,20 @@ EOF
 
   ensure_config_dir
   mkdir -p /opt/mtg
+  chmod 700 /opt/mtg
 
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
     echo
     t step_gen_ee
     EE_SECRET="$(docker run --rm "$MTG_IMAGE" generate-secret --hex "$FRONT_DOMAIN" | tr -d '\r\n')"
+    # Docker host IP binding is controlled by -p ${EE_BIND_IP}:${EE_PORT}:3128 in systemd.
+    # mtg internal bind stays 0.0.0.0:3128 inside container.
+    umask 077
     cat >/opt/mtg/config.toml <<EOF
 secret = "$EE_SECRET"
 bind-to = "0.0.0.0:3128"
 EOF
+    chmod 600 /opt/mtg/config.toml
     write_ee_env_file
     write_ee_systemd_unit
   fi
