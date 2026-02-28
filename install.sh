@@ -112,6 +112,7 @@ t() {
         menu_healthcheck) echo "healthcheck" ;;
         menu_self_heal) echo "self-heal" ;;
         menu_upgrade) echo "upgrade" ;;
+        menu_self_update) echo "self-update" ;;
         menu_rotate_secret) echo "rotate-secret" ;;
         menu_uninstall) echo "uninstall" ;;
         menu_help) echo "help" ;;
@@ -130,6 +131,10 @@ t() {
         err_primary_ipv4_unavailable) echo "Primary IPv4 unavailable." ;;
         err_ipv4_invalid) echo "Invalid IPv4 format." ;;
         err_bind_ip_not_found) echo "IP not found on this host." ;;
+        step_self_update) echo "Step: Updating script repository (git pull --ff-only)." ;;
+        err_self_update_not_git) echo "Self-update requires a git clone directory containing .git." ;;
+        note_self_update_done) echo "Self-update completed." ;;
+        note_self_update_rerun) echo "Run the installer again to apply new logic:" ;;
       esac
       ;;
     zh)
@@ -193,6 +198,7 @@ t() {
         menu_healthcheck) echo "健康检查" ;;
         menu_self_heal) echo "自愈" ;;
         menu_upgrade) echo "升级" ;;
+        menu_self_update) echo "脚本自更新" ;;
         menu_rotate_secret) echo "轮换密钥" ;;
         menu_uninstall) echo "卸载" ;;
         menu_help) echo "帮助" ;;
@@ -211,6 +217,10 @@ t() {
         err_primary_ipv4_unavailable) echo "主 IPv4 不可用。" ;;
         err_ipv4_invalid) echo "IPv4 格式无效。" ;;
         err_bind_ip_not_found) echo "该 IP 不在本机网卡上。" ;;
+        step_self_update) echo "步骤：更新脚本仓库（git pull --ff-only）。" ;;
+        err_self_update_not_git) echo "脚本自更新需要在包含 .git 的仓库目录中执行。" ;;
+        note_self_update_done) echo "脚本自更新完成。" ;;
+        note_self_update_rerun) echo "请重新执行安装脚本以应用新逻辑：" ;;
       esac
       ;;
     ko)
@@ -274,6 +284,7 @@ t() {
         menu_healthcheck) echo "상태 점검" ;;
         menu_self_heal) echo "자동 복구" ;;
         menu_upgrade) echo "업그레이드" ;;
+        menu_self_update) echo "스크립트 자체 업데이트" ;;
         menu_rotate_secret) echo "시크릿 교체" ;;
         menu_uninstall) echo "제거" ;;
         menu_help) echo "도움말" ;;
@@ -292,6 +303,10 @@ t() {
         err_primary_ipv4_unavailable) echo "기본 IPv4를 사용할 수 없습니다." ;;
         err_ipv4_invalid) echo "IPv4 형식이 올바르지 않습니다." ;;
         err_bind_ip_not_found) echo "이 호스트에서 해당 IP를 찾을 수 없습니다." ;;
+        step_self_update) echo "단계: 스크립트 저장소 업데이트(git pull --ff-only)." ;;
+        err_self_update_not_git) echo "self-update는 .git 이 있는 git clone 디렉터리에서만 가능합니다." ;;
+        note_self_update_done) echo "스크립트 자체 업데이트가 완료되었습니다." ;;
+        note_self_update_rerun) echo "새 로직 적용을 위해 설치 스크립트를 다시 실행하세요:" ;;
       esac
       ;;
     ja)
@@ -355,6 +370,7 @@ t() {
         menu_healthcheck) echo "ヘルスチェック" ;;
         menu_self_heal) echo "自動復旧" ;;
         menu_upgrade) echo "アップグレード" ;;
+        menu_self_update) echo "スクリプト自己更新" ;;
         menu_rotate_secret) echo "シークレット更新" ;;
         menu_uninstall) echo "アンインストール" ;;
         menu_help) echo "ヘルプ" ;;
@@ -373,6 +389,10 @@ t() {
         err_primary_ipv4_unavailable) echo "プライマリIPv4は利用できません。" ;;
         err_ipv4_invalid) echo "IPv4形式が不正です。" ;;
         err_bind_ip_not_found) echo "このホストにそのIPはありません。" ;;
+        step_self_update) echo "手順：スクリプトリポジトリを更新（git pull --ff-only）。" ;;
+        err_self_update_not_git) echo "self-update は .git を含む git clone ディレクトリで実行する必要があります。" ;;
+        note_self_update_done) echo "スクリプト自己更新が完了しました。" ;;
+        note_self_update_rerun) echo "新しいロジックを適用するには再実行してください:" ;;
       esac
       ;;
   esac
@@ -688,6 +708,7 @@ usage() {
   cat <<'EOF'
 Usage:
   install.sh [install]
+  install.sh self-update
   install.sh uninstall [--mode ee|dd|all]
   install.sh upgrade [--mode ee|dd|all] [--mtg-image IMAGE@sha256:...] [--dd-image IMAGE@sha256:...]
   install.sh healthcheck [--mode ee|dd|all]
@@ -696,6 +717,7 @@ Usage:
 
 Notes:
   - No arguments: open interactive menu.
+  - self-update pulls the latest script repository by fast-forward only.
   - 'install' command: start interactive install flow directly.
   - rotate-secret for DD accepts either 32-hex or dd+32-hex.
 EOF
@@ -1087,6 +1109,22 @@ cmd_uninstall() {
   fi
   systemd_reload
   rmdir "$CONFIG_DIR" >/dev/null 2>&1 || true
+}
+
+cmd_self_update() {
+  local script_dir
+  script_dir="$(cd "$(dirname "$0")" && pwd -P)"
+  if [[ ! -d "${script_dir}/.git" ]]; then
+    t err_self_update_not_git
+    echo "${script_dir}"
+    return 1
+  fi
+  echo
+  t step_self_update
+  git -C "$script_dir" pull --ff-only
+  t note_self_update_done
+  t note_self_update_rerun
+  echo "sudo bash ${script_dir}/install.sh"
 }
 
 cmd_upgrade() {
@@ -1498,9 +1536,10 @@ interactive_menu() {
     echo "2) $(t menu_healthcheck)"
     echo "3) $(t menu_self_heal)"
     echo "4) $(t menu_upgrade)"
-    echo "5) $(t menu_rotate_secret)"
-    echo "6) $(t menu_uninstall)"
-    echo "7) $(t menu_help)"
+    echo "5) $(t menu_self_update)"
+    echo "6) $(t menu_rotate_secret)"
+    echo "7) $(t menu_uninstall)"
+    echo "8) $(t menu_help)"
     echo "0) $(t menu_exit)"
     read -rp "> " choice
     choice="${choice// /}"
@@ -1535,6 +1574,9 @@ interactive_menu() {
         fi
         ;;
       5)
+        cmd_self_update
+        ;;
+      6)
         rotate_mode="$(prompt_mode_rotate)"
         read -rp "$(t ask_new_secret)" rotate_secret
         rotate_front=""
@@ -1546,14 +1588,14 @@ interactive_menu() {
           cmd_healthcheck || true
         fi
         ;;
-      6)
+      7)
         mode="$(prompt_mode_all)"
         set_mode_flags "$mode" || continue
         if confirm_continue; then
           cmd_uninstall
         fi
         ;;
-      7)
+      8)
         usage
         ;;
       0)
@@ -1583,6 +1625,15 @@ main() {
   case "$cmd" in
     install)
       command_install
+      ;;
+    self-update | self_update)
+      shift || true
+      if (($#)); then
+        echo "Unknown argument: $1"
+        usage
+        exit 1
+      fi
+      cmd_self_update
       ;;
     uninstall)
       shift || true

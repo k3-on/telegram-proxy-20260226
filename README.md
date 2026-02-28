@@ -45,6 +45,9 @@ sudo bash install.sh self-heal --mode all
 sudo bash install.sh upgrade --mode ee --mtg-image 'nineseconds/mtg@sha256:<digest>'
 sudo bash install.sh upgrade --mode dd --dd-image 'telegrammessenger/proxy@sha256:<digest>'
 
+# self-update script repo
+sudo bash install.sh self-update
+
 # manual secret rotation
 sudo bash install.sh rotate-secret --mode ee --secret '<new_ee_secret_hex>'
 sudo bash install.sh rotate-secret --mode dd --secret 'dd<32hex>'  # or just 32hex
@@ -111,6 +114,9 @@ sudo bash install.sh self-heal --mode all
 # 升级镜像 digest
 sudo bash install.sh upgrade --mode ee --mtg-image 'nineseconds/mtg@sha256:<digest>'
 sudo bash install.sh upgrade --mode dd --dd-image 'telegrammessenger/proxy@sha256:<digest>'
+
+# 脚本自更新
+sudo bash install.sh self-update
 
 # 手动轮换 secret
 sudo bash install.sh rotate-secret --mode ee --secret '<new_ee_secret_hex>'
@@ -179,6 +185,9 @@ sudo bash install.sh self-heal --mode all
 sudo bash install.sh upgrade --mode ee --mtg-image 'nineseconds/mtg@sha256:<digest>'
 sudo bash install.sh upgrade --mode dd --dd-image 'telegrammessenger/proxy@sha256:<digest>'
 
+# 스크립트 자체 업데이트
+sudo bash install.sh self-update
+
 # secret 수동 교체
 sudo bash install.sh rotate-secret --mode ee --secret '<new_ee_secret_hex>'
 sudo bash install.sh rotate-secret --mode dd --secret 'dd<32hex>'  # 또는 32hex
@@ -245,6 +254,9 @@ sudo bash install.sh self-heal --mode all
 # イメージ digest 更新
 sudo bash install.sh upgrade --mode ee --mtg-image 'nineseconds/mtg@sha256:<digest>'
 sudo bash install.sh upgrade --mode dd --dd-image 'telegrammessenger/proxy@sha256:<digest>'
+
+# スクリプト自己更新
+sudo bash install.sh self-update
 
 # secret 手動ローテーション
 sudo bash install.sh rotate-secret --mode ee --secret '<new_ee_secret_hex>'
