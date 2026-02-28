@@ -1000,6 +1000,7 @@ check_mode_health() {
   local env_file=""
   local port=""
   local ok=0
+  local mode_container_running=0
 
   case "$mode" in
     ee)
@@ -1017,7 +1018,16 @@ check_mode_health() {
       ;;
   esac
 
+  if docker ps --format '{{.Names}}' | grep -qx "$container_name"; then
+    mode_container_running=1
+  fi
+
   if [[ ! -f "$env_file" ]]; then
+    if [[ "$mode_container_running" -eq 1 ]]; then
+      echo "[${mode}] legacy deployment detected: container is running, but env is missing (${env_file})"
+      echo "[${mode}] run install to migrate this instance under script management"
+      return 0
+    fi
     echo "[${mode}] not installed (env missing: ${env_file})"
     return 2
   fi
