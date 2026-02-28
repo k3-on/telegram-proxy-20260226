@@ -81,6 +81,7 @@ t() {
         opt_manual_input) echo "Manual input" ;;
         opt_recommended) echo "recommended" ;;
         ask_enable_bbr) echo "Enable BBR+fq (recommended) [Y/n]: " ;;
+        ask_strict_ufw) echo "Enable strict UFW rules bound to selected IP(s) [y/N]: " ;;
         ask_continue_anyway) echo "Continue anyway? [y/N]: " ;;
         err_port_num) echo "Port must be a number between 1 and 65535." ;;
         err_port_conflict) echo "EE port and DD port cannot be the same on a single IP. Choose different ports." ;;
@@ -138,6 +139,7 @@ t() {
         opt_manual_input) echo "手动输入" ;;
         opt_recommended) echo "推荐" ;;
         ask_enable_bbr) echo "是否启用 BBR+fq（推荐）[Y/n]： " ;;
+        ask_strict_ufw) echo "是否启用严格 UFW 规则（按所选 IP 放行）[y/N]： " ;;
         ask_continue_anyway) echo "是否仍继续？[y/N]： " ;;
         err_port_num) echo "端口必须是 1~65535 的数字。" ;;
         err_port_conflict) echo "同一台机器的同一个 IP 上，EE 和 DD 不能使用同一个端口。请选不同端口。" ;;
@@ -195,6 +197,7 @@ t() {
         opt_manual_input) echo "수동 입력" ;;
         opt_recommended) echo "권장" ;;
         ask_enable_bbr) echo "BBR+fq 활성화(권장) [Y/n]: " ;;
+        ask_strict_ufw) echo "선택한 IP에만 적용되는 엄격한 UFW 규칙을 사용할까요? [y/N]: " ;;
         ask_continue_anyway) echo "계속 진행할까요? [y/N]: " ;;
         err_port_num) echo "포트는 1~65535 사이의 숫자여야 합니다." ;;
         err_port_conflict) echo "같은 IP에서 EE와 DD는 동일 포트를 사용할 수 없습니다." ;;
@@ -252,6 +255,7 @@ t() {
         opt_manual_input) echo "手動入力" ;;
         opt_recommended) echo "推奨" ;;
         ask_enable_bbr) echo "BBR+fqを有効化（推奨）[Y/n]: " ;;
+        ask_strict_ufw) echo "選択したIPに限定する厳格なUFWルールを有効化しますか？ [y/N]: " ;;
         ask_continue_anyway) echo "このまま続行しますか？ [y/N]: " ;;
         err_port_num) echo "ポートは1〜65535の数字である必要があります。" ;;
         err_port_conflict) echo "同一IPではEEとDDを同じポートにできません。" ;;
@@ -706,6 +710,17 @@ ports_conflict_for_bindings() {
   return 1
 }
 
+ufw_allow_proxy_port() {
+  local p="$1"
+  local bind_ip="$2"
+  local strict="$3"
+  if [[ "$strict" =~ ^[Yy]$ ]] && [[ "$bind_ip" != "0.0.0.0" ]]; then
+    ufw allow proto tcp from any to "$bind_ip" port "$p" >/dev/null
+  else
+    ufw allow "${p}/tcp" >/dev/null
+  fi
+}
+
 preflight_checks() {
   local warnings=()
   local mem_kb=""
@@ -808,7 +823,7 @@ Requires=docker.service
 Type=simple
 Restart=always
 RestartSec=5
-EnvironmentFile=-/etc/telegram-proxy/ee.env
+EnvironmentFile=/etc/telegram-proxy/ee.env
 ExecStartPre=-/usr/bin/docker rm -f mtg-ee
 ExecStart=/usr/bin/docker run --name mtg-ee --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=256 -v /opt/mtg/config.toml:/config.toml:ro -p ${EE_BIND_IP}:${EE_PORT}:3128 ${MTG_IMAGE}
 ExecStop=/usr/bin/docker stop -t 10 mtg-ee
@@ -831,7 +846,7 @@ Requires=docker.service
 Type=simple
 Restart=always
 RestartSec=5
-EnvironmentFile=-/etc/telegram-proxy/dd.env
+EnvironmentFile=/etc/telegram-proxy/dd.env
 ExecStartPre=-/usr/bin/docker rm -f mtproto-dd
 ExecStart=/usr/bin/docker run --name mtproto-dd --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=256 -p ${DD_BIND_IP}:${DD_PORT}:443 -e SECRET=${DD_SECRET} ${DD_IMAGE}
 ExecStop=/usr/bin/docker stop -t 10 mtproto-dd
@@ -1069,8 +1084,8 @@ cmd_rotate_secret() {
         input_secret="$(docker run --rm "$MTG_IMAGE" generate-secret --hex "$use_front" | tr -d '\r\n')"
         upsert_env_key "$EE_ENV_FILE" "FRONT_DOMAIN" "$use_front"
       fi
-      if [[ ! "$input_secret" =~ ^[A-Fa-f0-9]{32,}$ ]]; then
-        echo "Invalid EE secret format."
+      if [[ ! "$input_secret" =~ ^[Ee][Ee][A-Fa-f0-9]{32,}$ ]]; then
+        echo "Invalid EE secret format (expected ee... hex)."
         return 1
       fi
       EE_SECRET="${input_secret,,}"
@@ -1118,6 +1133,7 @@ EOF
 command_install() {
   local SERVER_IPV4=""
   local ENABLE_BBR="Y"
+  local STRICT_UFW="N"
   local EE_BIND_IP="0.0.0.0"
   local DD_BIND_IP="0.0.0.0"
 
@@ -1167,6 +1183,12 @@ command_install() {
   read -r ENABLE_BBR
   ENABLE_BBR="${ENABLE_BBR:-Y}"
 
+  if [[ ("$DEPLOY_EE" -eq 1 && "$EE_BIND_IP" != "0.0.0.0") || ("$DEPLOY_DD" -eq 1 && "$DD_BIND_IP" != "0.0.0.0") ]]; then
+    echo -n "$(t ask_strict_ufw)"
+    read -r STRICT_UFW
+    STRICT_UFW="${STRICT_UFW:-N}"
+  fi
+
   preflight_checks
 
   echo
@@ -1214,10 +1236,10 @@ EOF
     ufw allow "${ssh_port}/tcp" >/dev/null
   done < <(collect_sshd_ports)
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
-    ufw allow "${EE_PORT}/tcp" >/dev/null
+    ufw_allow_proxy_port "$EE_PORT" "$EE_BIND_IP" "$STRICT_UFW"
   fi
   if [[ "$DEPLOY_DD" -eq 1 ]]; then
-    ufw allow "${DD_PORT}/tcp" >/dev/null
+    ufw_allow_proxy_port "$DD_PORT" "$DD_BIND_IP" "$STRICT_UFW"
   fi
   if ufw status | grep -qi inactive; then
     ufw --force enable >/dev/null
@@ -1303,22 +1325,11 @@ EOF
   echo
 
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
-    echo "================= EE (FakeTLS / mtg) ================="
-    echo "Entry domain : ${EE_DOMAIN}"
-    echo "Bind IP      : ${EE_BIND_IP}"
-    echo "Port         : ${EE_PORT}"
-    echo "Fronting     : ${FRONT_DOMAIN}"
-    echo "Secret (EE)  : ${EE_SECRET}"
-    echo "Import link  : tg://proxy?server=${EE_DOMAIN}&port=${EE_PORT}&secret=${EE_SECRET}"
+    echo "EE (FakeTLS): tg://proxy?server=${EE_DOMAIN}&port=${EE_PORT}&secret=${EE_SECRET}"
     echo
   fi
   if [[ "$DEPLOY_DD" -eq 1 ]]; then
-    echo "================= DD (padding / MTProxy) ============="
-    echo "Entry domain : ${DD_DOMAIN}"
-    echo "Bind IP      : ${DD_BIND_IP}"
-    echo "Port         : ${DD_PORT}"
-    echo "Secret (DD)  : ${DD_SECRET}"
-    echo "Import link  : tg://proxy?server=${DD_DOMAIN}&port=${DD_PORT}&secret=${DD_SECRET}"
+    echo "DD (padding): tg://proxy?server=${DD_DOMAIN}&port=${DD_PORT}&secret=${DD_SECRET}"
     echo
   fi
   cmd_healthcheck || true

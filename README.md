@@ -16,6 +16,7 @@ A one-click interactive installer for Telegram MTProto proxy on Ubuntu 22.04.
 - Fronting domain: preset options + single manual input
 - Port: preset options + manual input, conflict detection, optional old-proxy cleanup
 - Bind IP selection for multi-IP hosts
+- Optional strict UFW rules scoped to selected bind IP(s)
 - `systemd` managed services for EE/DD
 - Ops commands: `healthcheck`, `self-heal`, `upgrade`, `uninstall`, `rotate-secret`
 - Preflight checks: OS/memory/disk/time sync/DNS
@@ -29,9 +30,7 @@ A one-click interactive installer for Telegram MTProto proxy on Ubuntu 22.04.
 
 ### Quick Start
 ```bash
-git clone https://github.com/k3-on/telegram-proxy-20260226.git
-cd telegram-proxy-20260226
-sudo bash install.sh
+git -C ~/telegram-proxy-20260226 pull || git clone https://github.com/k3-on/telegram-proxy-20260226.git ~/telegram-proxy-20260226; sudo bash ~/telegram-proxy-20260226/install.sh
 ```
 
 ### Operations
@@ -84,6 +83,7 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 - Fronting 域名：预设选项 + 单个手动输入
 - 端口：预设选项 + 手动输入，冲突检测，可选清理旧代理容器
 - 支持绑定 IP（多公网 IP 场景）
+- 可选启用按绑定 IP 精确放行的严格 UFW 规则
 - 使用 `systemd` 托管 EE/DD 服务
 - 运维命令：`healthcheck`、`self-heal`、`upgrade`、`uninstall`、`rotate-secret`
 - 增强前置检查：系统/内存/磁盘/时间同步/DNS
@@ -97,9 +97,7 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 
 ### 快速开始
 ```bash
-git clone https://github.com/k3-on/telegram-proxy-20260226.git
-cd telegram-proxy-20260226
-sudo bash install.sh
+git -C ~/telegram-proxy-20260226 pull || git clone https://github.com/k3-on/telegram-proxy-20260226.git ~/telegram-proxy-20260226; sudo bash ~/telegram-proxy-20260226/install.sh
 ```
 
 ### 运维命令
@@ -152,6 +150,7 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 - Fronting 도메인: 프리셋 + 단일 수동 입력
 - 포트: 프리셋 + 수동 입력, 충돌 감지, 기존 프록시 정리 옵션
 - 멀티 공인 IP 환경에서 바인드 IP 선택 지원
+- 선택한 바인드 IP에 한정한 엄격 UFW 규칙(옵션)
 - EE/DD 서비스를 `systemd` 로 관리
 - 운영 명령: `healthcheck`, `self-heal`, `upgrade`, `uninstall`, `rotate-secret`
 - 사전 점검: OS/메모리/디스크/시간 동기화/DNS
@@ -165,9 +164,7 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 
 ### 빠른 시작
 ```bash
-git clone https://github.com/k3-on/telegram-proxy-20260226.git
-cd telegram-proxy-20260226
-sudo bash install.sh
+git -C ~/telegram-proxy-20260226 pull || git clone https://github.com/k3-on/telegram-proxy-20260226.git ~/telegram-proxy-20260226; sudo bash ~/telegram-proxy-20260226/install.sh
 ```
 
 ### 운영 명령
@@ -220,6 +217,7 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 - fronting ドメイン: プリセット + 単一手動入力
 - ポート: プリセット + 手動入力、競合検出、旧プロキシ整理オプション
 - マルチIP環境でバインドIP選択に対応
+- 選択したバインドIPに限定する厳格なUFWルール（任意）
 - EE/DD を `systemd` で管理
 - 運用コマンド: `healthcheck`、`self-heal`、`upgrade`、`uninstall`、`rotate-secret`
 - 事前チェック: OS/メモリ/ディスク/時刻同期/DNS
@@ -233,9 +231,7 @@ docker image inspect telegrammessenger/proxy:latest --format '{{index .RepoDiges
 
 ### クイックスタート
 ```bash
-git clone https://github.com/k3-on/telegram-proxy-20260226.git
-cd telegram-proxy-20260226
-sudo bash install.sh
+git -C ~/telegram-proxy-20260226 pull || git clone https://github.com/k3-on/telegram-proxy-20260226.git ~/telegram-proxy-20260226; sudo bash ~/telegram-proxy-20260226/install.sh
 ```
 
 ### 運用コマンド
