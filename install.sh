@@ -1468,10 +1468,10 @@ EOF
 prompt_mode_all() {
   local mode_choice=""
   while true; do
-    t ask_oper_mode
-    echo "1) ee"
-    echo "2) dd"
-    echo "3) all"
+    t ask_oper_mode >&2
+    echo "1) ee" >&2
+    echo "2) dd" >&2
+    echo "3) all" >&2
     read -rp "> " mode_choice
     mode_choice="${mode_choice// /}"
     case "$mode_choice" in
@@ -1488,7 +1488,7 @@ prompt_mode_all() {
         return 0
         ;;
       *)
-        t err_choice_invalid
+        t err_choice_invalid >&2
         ;;
     esac
   done
@@ -1497,9 +1497,9 @@ prompt_mode_all() {
 prompt_mode_rotate() {
   local mode_choice=""
   while true; do
-    t ask_rotate_mode
-    echo "1) ee"
-    echo "2) dd"
+    t ask_rotate_mode >&2
+    echo "1) ee" >&2
+    echo "2) dd" >&2
     read -rp "> " mode_choice
     mode_choice="${mode_choice// /}"
     case "$mode_choice" in
@@ -1512,7 +1512,7 @@ prompt_mode_rotate() {
         return 0
         ;;
       *)
-        t err_choice_invalid
+        t err_choice_invalid >&2
         ;;
     esac
   done
