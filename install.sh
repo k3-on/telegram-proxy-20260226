@@ -107,6 +107,29 @@ t() {
         note_secret) echo "Do NOT share secrets publicly. Anyone with the secret can use your proxy." ;;
         note_no_cdn) echo "Important: DNS should be 'DNS only' (no CDN proxy). MTProto is not standard HTTPS." ;;
         err_image_ref_invalid) echo "Image reference must be digest format: name@sha256:64hex. Please set MTG_IMAGE/DD_IMAGE." ;;
+        menu_title) echo "Main Menu" ;;
+        menu_install) echo "install" ;;
+        menu_healthcheck) echo "healthcheck" ;;
+        menu_self_heal) echo "self-heal" ;;
+        menu_upgrade) echo "upgrade" ;;
+        menu_rotate_secret) echo "rotate-secret" ;;
+        menu_uninstall) echo "uninstall" ;;
+        menu_help) echo "help" ;;
+        menu_exit) echo "exit" ;;
+        ask_oper_mode) echo "Select mode:" ;;
+        ask_rotate_mode) echo "Select rotate mode:" ;;
+        ask_new_mtg_image) echo "Enter new MTG image digest (blank=keep current): " ;;
+        ask_new_dd_image) echo "Enter new DD image digest (blank=keep current): " ;;
+        ask_new_secret) echo "Enter new secret (blank=auto for EE): " ;;
+        ask_front_for_auto_secret) echo "Enter front-domain for EE auto secret (blank=keep current): " ;;
+        ask_bind_ip_mode) echo "Choose bind IP:" ;;
+        opt_all_interfaces) echo "all interfaces, recommended" ;;
+        opt_primary_ipv4) echo "primary IPv4" ;;
+        opt_unavailable) echo "unavailable" ;;
+        ask_bind_ipv4) echo "Enter bind IPv4 (or 0.0.0.0): " ;;
+        err_primary_ipv4_unavailable) echo "Primary IPv4 unavailable." ;;
+        err_ipv4_invalid) echo "Invalid IPv4 format." ;;
+        err_bind_ip_not_found) echo "IP not found on this host." ;;
       esac
       ;;
     zh)
@@ -165,6 +188,29 @@ t() {
         note_secret) echo "不要公开分享 secret。任何拿到 secret 的人都能使用你的代理。" ;;
         note_no_cdn) echo "重要：DNS 必须是 DNS only/灰云（不要 CDN 代理）。MTProto 不是标准 HTTPS。" ;;
         err_image_ref_invalid) echo "镜像引用必须是 digest 格式：name@sha256:64位十六进制。请设置 MTG_IMAGE/DD_IMAGE。" ;;
+        menu_title) echo "主菜单" ;;
+        menu_install) echo "安装" ;;
+        menu_healthcheck) echo "健康检查" ;;
+        menu_self_heal) echo "自愈" ;;
+        menu_upgrade) echo "升级" ;;
+        menu_rotate_secret) echo "轮换密钥" ;;
+        menu_uninstall) echo "卸载" ;;
+        menu_help) echo "帮助" ;;
+        menu_exit) echo "退出" ;;
+        ask_oper_mode) echo "请选择模式：" ;;
+        ask_rotate_mode) echo "请选择轮换模式：" ;;
+        ask_new_mtg_image) echo "请输入新的 MTG 镜像 digest（留空=保持当前）： " ;;
+        ask_new_dd_image) echo "请输入新的 DD 镜像 digest（留空=保持当前）： " ;;
+        ask_new_secret) echo "请输入新 secret（留空=EE 自动生成）： " ;;
+        ask_front_for_auto_secret) echo "请输入 EE 自动生成 secret 的 front-domain（留空=保持当前）： " ;;
+        ask_bind_ip_mode) echo "请选择绑定 IP：" ;;
+        opt_all_interfaces) echo "全部网卡，推荐" ;;
+        opt_primary_ipv4) echo "主 IPv4" ;;
+        opt_unavailable) echo "不可用" ;;
+        ask_bind_ipv4) echo "请输入绑定 IPv4（或 0.0.0.0）： " ;;
+        err_primary_ipv4_unavailable) echo "主 IPv4 不可用。" ;;
+        err_ipv4_invalid) echo "IPv4 格式无效。" ;;
+        err_bind_ip_not_found) echo "该 IP 不在本机网卡上。" ;;
       esac
       ;;
     ko)
@@ -223,6 +269,29 @@ t() {
         note_secret) echo "시크릿을 공개 공유하지 마세요." ;;
         note_no_cdn) echo "중요: DNS only(프록시/CDN 금지)." ;;
         err_image_ref_invalid) echo "이미지 참조는 digest 형식(name@sha256:64hex)이어야 합니다. MTG_IMAGE/DD_IMAGE를 설정하세요." ;;
+        menu_title) echo "메인 메뉴" ;;
+        menu_install) echo "설치" ;;
+        menu_healthcheck) echo "상태 점검" ;;
+        menu_self_heal) echo "자동 복구" ;;
+        menu_upgrade) echo "업그레이드" ;;
+        menu_rotate_secret) echo "시크릿 교체" ;;
+        menu_uninstall) echo "제거" ;;
+        menu_help) echo "도움말" ;;
+        menu_exit) echo "종료" ;;
+        ask_oper_mode) echo "모드를 선택하세요:" ;;
+        ask_rotate_mode) echo "시크릿 교체 모드를 선택하세요:" ;;
+        ask_new_mtg_image) echo "새 MTG 이미지 digest 입력 (빈값=현재 유지): " ;;
+        ask_new_dd_image) echo "새 DD 이미지 digest 입력 (빈값=현재 유지): " ;;
+        ask_new_secret) echo "새 시크릿 입력 (빈값=EE 자동 생성): " ;;
+        ask_front_for_auto_secret) echo "EE 자동 시크릿용 front-domain 입력 (빈값=현재 유지): " ;;
+        ask_bind_ip_mode) echo "바인드 IP를 선택하세요:" ;;
+        opt_all_interfaces) echo "모든 인터페이스, 권장" ;;
+        opt_primary_ipv4) echo "기본 IPv4" ;;
+        opt_unavailable) echo "사용 불가" ;;
+        ask_bind_ipv4) echo "바인드 IPv4 입력(또는 0.0.0.0): " ;;
+        err_primary_ipv4_unavailable) echo "기본 IPv4를 사용할 수 없습니다." ;;
+        err_ipv4_invalid) echo "IPv4 형식이 올바르지 않습니다." ;;
+        err_bind_ip_not_found) echo "이 호스트에서 해당 IP를 찾을 수 없습니다." ;;
       esac
       ;;
     ja)
@@ -281,6 +350,29 @@ t() {
         note_secret) echo "シークレットを公開しないでください。" ;;
         note_no_cdn) echo "重要：DNSはDNS only（CDNプロキシ禁止）。" ;;
         err_image_ref_invalid) echo "イメージ参照はdigest形式(name@sha256:64hex)である必要があります。MTG_IMAGE/DD_IMAGEを設定してください。" ;;
+        menu_title) echo "メインメニュー" ;;
+        menu_install) echo "インストール" ;;
+        menu_healthcheck) echo "ヘルスチェック" ;;
+        menu_self_heal) echo "自動復旧" ;;
+        menu_upgrade) echo "アップグレード" ;;
+        menu_rotate_secret) echo "シークレット更新" ;;
+        menu_uninstall) echo "アンインストール" ;;
+        menu_help) echo "ヘルプ" ;;
+        menu_exit) echo "終了" ;;
+        ask_oper_mode) echo "モードを選択してください:" ;;
+        ask_rotate_mode) echo "シークレット更新モードを選択してください:" ;;
+        ask_new_mtg_image) echo "新しいMTGイメージdigestを入力（空欄=現状維持）: " ;;
+        ask_new_dd_image) echo "新しいDDイメージdigestを入力（空欄=現状維持）: " ;;
+        ask_new_secret) echo "新しいシークレットを入力（空欄=EE自動生成）: " ;;
+        ask_front_for_auto_secret) echo "EE自動生成用front-domainを入力（空欄=現状維持）: " ;;
+        ask_bind_ip_mode) echo "バインドIPを選択してください:" ;;
+        opt_all_interfaces) echo "全インターフェース、推奨" ;;
+        opt_primary_ipv4) echo "プライマリIPv4" ;;
+        opt_unavailable) echo "利用不可" ;;
+        ask_bind_ipv4) echo "バインドIPv4を入力（または0.0.0.0）: " ;;
+        err_primary_ipv4_unavailable) echo "プライマリIPv4は利用できません。" ;;
+        err_ipv4_invalid) echo "IPv4形式が不正です。" ;;
+        err_bind_ip_not_found) echo "このホストにそのIPはありません。" ;;
       esac
       ;;
   esac
@@ -655,14 +747,14 @@ ask_bind_ip_with_options() {
   local choice=""
   local input_ip=""
   while true; do
-    echo "Choose bind IP / 选择绑定IP:"
-    echo "1) 0.0.0.0 (all interfaces, recommended)"
+    t ask_bind_ip_mode
+    echo "1) 0.0.0.0 ($(t opt_all_interfaces))"
     if [[ -n "$primary_ip" ]]; then
-      echo "2) ${primary_ip} (primary IPv4)"
+      echo "2) ${primary_ip} ($(t opt_primary_ipv4))"
     else
-      echo "2) primary IPv4 (unavailable)"
+      echo "2) $(t opt_primary_ipv4) ($(t opt_unavailable))"
     fi
-    echo "3) Manual input / 手动输入"
+    echo "3) $(t opt_manual_input)"
     read -rp "> " choice
     choice="${choice// /}"
     case "$choice" in
@@ -675,17 +767,17 @@ ask_bind_ip_with_options() {
           printf -v "$var_name" "%s" "$primary_ip"
           return 0
         fi
-        echo "Primary IPv4 unavailable."
+        t err_primary_ipv4_unavailable
         ;;
       3)
-        read -rp "Enter bind IPv4 (or 0.0.0.0): " input_ip
+        read -rp "$(t ask_bind_ipv4)" input_ip
         input_ip="${input_ip// /}"
         if ! is_valid_ipv4 "$input_ip"; then
-          echo "Invalid IPv4 format."
+          t err_ipv4_invalid
           continue
         fi
         if ! is_local_bind_ip "$input_ip"; then
-          echo "IP not found on this host."
+          t err_bind_ip_not_found
           continue
         fi
         printf -v "$var_name" "%s" "$input_ip"
@@ -1338,7 +1430,7 @@ EOF
 prompt_mode_all() {
   local mode_choice=""
   while true; do
-    echo "Select mode:"
+    t ask_oper_mode
     echo "1) ee"
     echo "2) dd"
     echo "3) all"
@@ -1367,7 +1459,7 @@ prompt_mode_all() {
 prompt_mode_rotate() {
   local mode_choice=""
   while true; do
-    echo "Select rotate mode:"
+    t ask_rotate_mode
     echo "1) ee"
     echo "2) dd"
     read -rp "> " mode_choice
@@ -1401,15 +1493,15 @@ interactive_menu() {
 
   while true; do
     echo
-    echo "================ Main Menu ================"
-    echo "1) install"
-    echo "2) healthcheck"
-    echo "3) self-heal"
-    echo "4) upgrade"
-    echo "5) rotate-secret"
-    echo "6) uninstall"
-    echo "7) help"
-    echo "0) exit"
+    echo "================ $(t menu_title) ================"
+    echo "1) $(t menu_install)"
+    echo "2) $(t menu_healthcheck)"
+    echo "3) $(t menu_self_heal)"
+    echo "4) $(t menu_upgrade)"
+    echo "5) $(t menu_rotate_secret)"
+    echo "6) $(t menu_uninstall)"
+    echo "7) $(t menu_help)"
+    echo "0) $(t menu_exit)"
     read -rp "> " choice
     choice="${choice// /}"
 
@@ -1433,10 +1525,10 @@ interactive_menu() {
         mtg_image_arg=""
         dd_image_arg=""
         if [[ "$DEPLOY_EE" -eq 1 ]]; then
-          read -rp "Enter new MTG image digest (blank=keep current): " mtg_image_arg
+          read -rp "$(t ask_new_mtg_image)" mtg_image_arg
         fi
         if [[ "$DEPLOY_DD" -eq 1 ]]; then
-          read -rp "Enter new DD image digest (blank=keep current): " dd_image_arg
+          read -rp "$(t ask_new_dd_image)" dd_image_arg
         fi
         if cmd_upgrade "$mtg_image_arg" "$dd_image_arg"; then
           cmd_healthcheck || true
@@ -1444,10 +1536,10 @@ interactive_menu() {
         ;;
       5)
         rotate_mode="$(prompt_mode_rotate)"
-        read -rp "Enter new secret (blank=auto for EE): " rotate_secret
+        read -rp "$(t ask_new_secret)" rotate_secret
         rotate_front=""
         if [[ "$rotate_mode" == "ee" ]]; then
-          read -rp "Enter front-domain for EE auto secret (blank=keep current): " rotate_front
+          read -rp "$(t ask_front_for_auto_secret)" rotate_front
         fi
         if cmd_rotate_secret "$rotate_mode" "$rotate_secret" "$rotate_front"; then
           set_mode_flags "$rotate_mode" || continue
