@@ -28,6 +28,8 @@ EE_SERVICE_NAME="telegram-proxy-ee.service"
 DD_SERVICE_NAME="telegram-proxy-dd.service"
 EE_CONTAINER_NAME="mtg-ee"
 DD_CONTAINER_NAME="mtproto-dd"
+BACKUP_DIR="/var/backups/telegram-proxy"
+LOCK_FILE="/var/lock/telegram-proxy-install.lock"
 
 # ---------- i18n ----------
 UI_LANG="en"
@@ -135,6 +137,57 @@ t() {
         err_self_update_not_git) echo "Self-update requires a git clone directory containing .git." ;;
         note_self_update_done) echo "Self-update completed." ;;
         note_self_update_rerun) echo "Run the installer again to apply new logic:" ;;
+        menu_migrate) echo "migrate legacy" ;;
+        menu_rollback) echo "rollback" ;;
+        step_migrate) echo "Step: Migrating legacy running containers into script-managed systemd services." ;;
+        step_backup) echo "Step: Creating backup before change." ;;
+        step_rollback) echo "Step: Rolling back from backup." ;;
+        ask_backup_id) echo "Enter backup ID (blank = latest): " ;;
+        note_backup_saved) echo "Backup saved:" ;;
+        note_backup_latest) echo "Using latest backup:" ;;
+        note_backup_none) echo "No backups found." ;;
+        note_rollback_done) echo "Rollback completed." ;;
+        err_backup_not_found) echo "Backup ID not found." ;;
+        err_lock_busy) echo "Another install.sh process is running. Try again later." ;;
+        err_lock_unavailable) echo "flock is unavailable; cannot enforce single-run lock." ;;
+        err_migrate_no_legacy) echo "No legacy proxy containers found to migrate." ;;
+        err_legacy_container_missing) echo "Required legacy container is missing." ;;
+        note_migrate_done) echo "Migration completed and services are now managed by systemd." ;;
+        ask_existing_ee_secret) echo "Enter existing EE secret (ee...hex): " ;;
+        err_ee_secret_required) echo "EE secret is required for migration." ;;
+        warn_image_not_digest) echo "Current image is not digest-pinned. Falling back to default pinned digest." ;;
+        note_using_digest) echo "Using digest image:" ;;
+        note_recent_logs) echo "Recent container logs:" ;;
+        warn_service_restarts) echo "Service restart count is high:" ;;
+        warn_container_restarts) echo "Container restart count is high:" ;;
+        err_port_binding_mismatch) echo "Container port binding does not match configured bind IP/port." ;;
+        err_unknown_arg) echo "Unknown argument:" ;;
+        err_unknown_cmd) echo "Unknown command:" ;;
+        err_rotate_mode_required) echo "rotate-secret requires --mode ee|dd" ;;
+        err_mode_value_invalid) echo "Invalid mode value:" ;;
+        err_not_installed_ee) echo "EE is not installed." ;;
+        err_not_installed_dd) echo "DD is not installed." ;;
+        err_invalid_mtg_image) echo "Invalid MTG image digest:" ;;
+        err_invalid_dd_image) echo "Invalid DD image digest:" ;;
+        err_invalid_ee_secret) echo "Invalid EE secret format (expected ee... hex)." ;;
+        err_invalid_dd_secret) echo "Invalid DD secret format." ;;
+        err_migrate_port_missing) echo "Cannot detect host port binding from legacy container." ;;
+        note_legacy_detected) echo "legacy deployment detected: container is running, but env is missing" ;;
+        note_legacy_migrate) echo "run migrate/install to bring this instance under script management" ;;
+        ask_new_ee_secret_cli) echo "Enter new EE secret (hex). Leave empty to auto-generate: " ;;
+        ask_new_dd_secret_cli) echo "Enter new DD secret (32-hex or dd+32-hex): " ;;
+        note_attempt_restart_ee) echo "[ee] attempting restart..." ;;
+        note_attempt_restart_dd) echo "[dd] attempting restart..." ;;
+        hc_not_installed) echo "not installed (env missing)" ;;
+        hc_service_not_active) echo "service not active" ;;
+        hc_container_not_running) echo "container not running" ;;
+        hc_port_not_listening) echo "port not listening" ;;
+        hc_image_mismatch) echo "image mismatch" ;;
+        hc_healthy) echo "healthy" ;;
+        critical_need_systemctl) echo "Critical: systemctl is required." ;;
+        critical_need_apt) echo "Critical: apt-get is required." ;;
+        preflight_warnings) echo "Preflight warnings:" ;;
+        aborted_by_user) echo "Aborted by user." ;;
       esac
       ;;
     zh)
@@ -221,6 +274,57 @@ t() {
         err_self_update_not_git) echo "脚本自更新需要在包含 .git 的仓库目录中执行。" ;;
         note_self_update_done) echo "脚本自更新完成。" ;;
         note_self_update_rerun) echo "请重新执行安装脚本以应用新逻辑：" ;;
+        menu_migrate) echo "迁移旧部署" ;;
+        menu_rollback) echo "回滚" ;;
+        step_migrate) echo "步骤：将正在运行的旧容器迁移为脚本托管的 systemd 服务。" ;;
+        step_backup) echo "步骤：变更前创建备份。" ;;
+        step_rollback) echo "步骤：从备份执行回滚。" ;;
+        ask_backup_id) echo "请输入备份 ID（留空=最新）： " ;;
+        note_backup_saved) echo "备份已保存：" ;;
+        note_backup_latest) echo "使用最新备份：" ;;
+        note_backup_none) echo "未找到备份。" ;;
+        note_rollback_done) echo "回滚完成。" ;;
+        err_backup_not_found) echo "未找到该备份 ID。" ;;
+        err_lock_busy) echo "已有另一个 install.sh 正在运行，请稍后重试。" ;;
+        err_lock_unavailable) echo "系统缺少 flock，无法启用单实例运行锁。" ;;
+        err_migrate_no_legacy) echo "未发现可迁移的旧代理容器。" ;;
+        err_legacy_container_missing) echo "缺少需要迁移的旧容器。" ;;
+        note_migrate_done) echo "迁移完成，服务已纳入 systemd 托管。" ;;
+        ask_existing_ee_secret) echo "请输入现有 EE secret（ee...hex）： " ;;
+        err_ee_secret_required) echo "迁移需要 EE secret，不能为空。" ;;
+        warn_image_not_digest) echo "当前镜像不是 digest 固定形式，将回退到脚本默认 digest。" ;;
+        note_using_digest) echo "使用镜像 digest：" ;;
+        note_recent_logs) echo "最近容器日志：" ;;
+        warn_service_restarts) echo "服务重启次数偏高：" ;;
+        warn_container_restarts) echo "容器重启次数偏高：" ;;
+        err_port_binding_mismatch) echo "容器端口绑定与配置的绑定 IP/端口不一致。" ;;
+        err_unknown_arg) echo "未知参数：" ;;
+        err_unknown_cmd) echo "未知命令：" ;;
+        err_rotate_mode_required) echo "rotate-secret 必须指定 --mode ee|dd" ;;
+        err_mode_value_invalid) echo "模式值无效：" ;;
+        err_not_installed_ee) echo "EE 尚未安装。" ;;
+        err_not_installed_dd) echo "DD 尚未安装。" ;;
+        err_invalid_mtg_image) echo "MTG 镜像 digest 无效：" ;;
+        err_invalid_dd_image) echo "DD 镜像 digest 无效：" ;;
+        err_invalid_ee_secret) echo "EE secret 格式无效（应为 ee... 十六进制）。" ;;
+        err_invalid_dd_secret) echo "DD secret 格式无效。" ;;
+        err_migrate_port_missing) echo "无法从旧容器识别主机端口绑定。" ;;
+        note_legacy_detected) echo "发现旧部署：容器在运行，但 env 文件缺失" ;;
+        note_legacy_migrate) echo "请运行 migrate/install 将该实例纳入脚本托管" ;;
+        ask_new_ee_secret_cli) echo "请输入新的 EE secret（hex，留空=自动生成）： " ;;
+        ask_new_dd_secret_cli) echo "请输入新的 DD secret（32hex 或 dd+32hex）： " ;;
+        note_attempt_restart_ee) echo "[ee] 正在尝试重启..." ;;
+        note_attempt_restart_dd) echo "[dd] 正在尝试重启..." ;;
+        hc_not_installed) echo "未安装（缺少 env 文件）" ;;
+        hc_service_not_active) echo "服务未运行" ;;
+        hc_container_not_running) echo "容器未运行" ;;
+        hc_port_not_listening) echo "端口未监听" ;;
+        hc_image_mismatch) echo "镜像不匹配" ;;
+        hc_healthy) echo "健康" ;;
+        critical_need_systemctl) echo "关键错误：需要 systemctl。" ;;
+        critical_need_apt) echo "关键错误：需要 apt-get。" ;;
+        preflight_warnings) echo "前置检查警告：" ;;
+        aborted_by_user) echo "用户已中止。" ;;
       esac
       ;;
     ko)
@@ -307,6 +411,57 @@ t() {
         err_self_update_not_git) echo "self-update는 .git 이 있는 git clone 디렉터리에서만 가능합니다." ;;
         note_self_update_done) echo "스크립트 자체 업데이트가 완료되었습니다." ;;
         note_self_update_rerun) echo "새 로직 적용을 위해 설치 스크립트를 다시 실행하세요:" ;;
+        menu_migrate) echo "레거시 마이그레이션" ;;
+        menu_rollback) echo "롤백" ;;
+        step_migrate) echo "단계: 실행 중인 레거시 컨테이너를 systemd 관리 서비스로 마이그레이션." ;;
+        step_backup) echo "단계: 변경 전 백업 생성." ;;
+        step_rollback) echo "단계: 백업에서 롤백 수행." ;;
+        ask_backup_id) echo "백업 ID 입력 (빈값=최신): " ;;
+        note_backup_saved) echo "백업 저장됨:" ;;
+        note_backup_latest) echo "최신 백업 사용:" ;;
+        note_backup_none) echo "백업이 없습니다." ;;
+        note_rollback_done) echo "롤백 완료." ;;
+        err_backup_not_found) echo "해당 백업 ID를 찾을 수 없습니다." ;;
+        err_lock_busy) echo "다른 install.sh 프로세스가 실행 중입니다. 잠시 후 다시 시도하세요." ;;
+        err_lock_unavailable) echo "flock 명령이 없어 단일 실행 잠금을 적용할 수 없습니다." ;;
+        err_migrate_no_legacy) echo "마이그레이션할 레거시 프록시 컨테이너가 없습니다." ;;
+        err_legacy_container_missing) echo "필수 레거시 컨테이너가 없습니다." ;;
+        note_migrate_done) echo "마이그레이션 완료. 서비스가 systemd 관리로 전환되었습니다." ;;
+        ask_existing_ee_secret) echo "기존 EE 시크릿 입력 (ee...hex): " ;;
+        err_ee_secret_required) echo "마이그레이션에는 EE 시크릿이 필요합니다." ;;
+        warn_image_not_digest) echo "현재 이미지는 digest 고정이 아닙니다. 기본 고정 digest로 대체합니다." ;;
+        note_using_digest) echo "사용할 digest 이미지:" ;;
+        note_recent_logs) echo "최근 컨테이너 로그:" ;;
+        warn_service_restarts) echo "서비스 재시작 횟수가 높습니다:" ;;
+        warn_container_restarts) echo "컨테이너 재시작 횟수가 높습니다:" ;;
+        err_port_binding_mismatch) echo "컨테이너 포트 바인딩이 설정된 IP/포트와 다릅니다." ;;
+        err_unknown_arg) echo "알 수 없는 인자:" ;;
+        err_unknown_cmd) echo "알 수 없는 명령:" ;;
+        err_rotate_mode_required) echo "rotate-secret는 --mode ee|dd가 필요합니다." ;;
+        err_mode_value_invalid) echo "잘못된 모드 값:" ;;
+        err_not_installed_ee) echo "EE가 설치되어 있지 않습니다." ;;
+        err_not_installed_dd) echo "DD가 설치되어 있지 않습니다." ;;
+        err_invalid_mtg_image) echo "잘못된 MTG 이미지 digest:" ;;
+        err_invalid_dd_image) echo "잘못된 DD 이미지 digest:" ;;
+        err_invalid_ee_secret) echo "EE 시크릿 형식이 잘못되었습니다(ee... hex)." ;;
+        err_invalid_dd_secret) echo "DD 시크릿 형식이 잘못되었습니다." ;;
+        err_migrate_port_missing) echo "레거시 컨테이너에서 호스트 포트 바인딩을 감지할 수 없습니다." ;;
+        note_legacy_detected) echo "레거시 배포 감지: 컨테이너는 실행 중이지만 env 파일이 없습니다" ;;
+        note_legacy_migrate) echo "migrate/install로 이 인스턴스를 스크립트 관리로 전환하세요" ;;
+        ask_new_ee_secret_cli) echo "새 EE 시크릿 입력(hex, 빈값=자동 생성): " ;;
+        ask_new_dd_secret_cli) echo "새 DD 시크릿 입력(32hex 또는 dd+32hex): " ;;
+        note_attempt_restart_ee) echo "[ee] 재시작 시도 중..." ;;
+        note_attempt_restart_dd) echo "[dd] 재시작 시도 중..." ;;
+        hc_not_installed) echo "설치되지 않음(env 파일 없음)" ;;
+        hc_service_not_active) echo "서비스 비활성" ;;
+        hc_container_not_running) echo "컨테이너 미실행" ;;
+        hc_port_not_listening) echo "포트 미청취" ;;
+        hc_image_mismatch) echo "이미지 불일치" ;;
+        hc_healthy) echo "정상" ;;
+        critical_need_systemctl) echo "치명적 오류: systemctl 이 필요합니다." ;;
+        critical_need_apt) echo "치명적 오류: apt-get 이 필요합니다." ;;
+        preflight_warnings) echo "사전 점검 경고:" ;;
+        aborted_by_user) echo "사용자에 의해 중단되었습니다." ;;
       esac
       ;;
     ja)
@@ -393,6 +548,57 @@ t() {
         err_self_update_not_git) echo "self-update は .git を含む git clone ディレクトリで実行する必要があります。" ;;
         note_self_update_done) echo "スクリプト自己更新が完了しました。" ;;
         note_self_update_rerun) echo "新しいロジックを適用するには再実行してください:" ;;
+        menu_migrate) echo "旧構成を移行" ;;
+        menu_rollback) echo "ロールバック" ;;
+        step_migrate) echo "手順：稼働中の旧コンテナを script 管理の systemd サービスへ移行。" ;;
+        step_backup) echo "手順：変更前バックアップを作成。" ;;
+        step_rollback) echo "手順：バックアップからロールバック。" ;;
+        ask_backup_id) echo "バックアップIDを入力（空欄=最新）: " ;;
+        note_backup_saved) echo "バックアップ保存先:" ;;
+        note_backup_latest) echo "最新バックアップを使用:" ;;
+        note_backup_none) echo "バックアップがありません。" ;;
+        note_rollback_done) echo "ロールバック完了。" ;;
+        err_backup_not_found) echo "指定したバックアップIDが見つかりません。" ;;
+        err_lock_busy) echo "別の install.sh プロセスが実行中です。しばらくして再試行してください。" ;;
+        err_lock_unavailable) echo "flock が無いため単一起動ロックを有効化できません。" ;;
+        err_migrate_no_legacy) echo "移行対象の旧プロキシコンテナが見つかりません。" ;;
+        err_legacy_container_missing) echo "必要な旧コンテナが見つかりません。" ;;
+        note_migrate_done) echo "移行が完了し、systemd 管理に切り替わりました。" ;;
+        ask_existing_ee_secret) echo "既存EEシークレットを入力（ee...hex）: " ;;
+        err_ee_secret_required) echo "移行にはEEシークレットが必要です。" ;;
+        warn_image_not_digest) echo "現在のイメージはdigest固定ではないため、既定の固定digestへフォールバックします。" ;;
+        note_using_digest) echo "使用するdigestイメージ:" ;;
+        note_recent_logs) echo "直近のコンテナログ:" ;;
+        warn_service_restarts) echo "サービス再起動回数が高めです:" ;;
+        warn_container_restarts) echo "コンテナ再起動回数が高めです:" ;;
+        err_port_binding_mismatch) echo "コンテナのポートバインドが設定IP/ポートと一致しません。" ;;
+        err_unknown_arg) echo "不明な引数:" ;;
+        err_unknown_cmd) echo "不明なコマンド:" ;;
+        err_rotate_mode_required) echo "rotate-secret には --mode ee|dd が必要です" ;;
+        err_mode_value_invalid) echo "モード値が不正です:" ;;
+        err_not_installed_ee) echo "EE は未インストールです。" ;;
+        err_not_installed_dd) echo "DD は未インストールです。" ;;
+        err_invalid_mtg_image) echo "MTG イメージdigestが不正です:" ;;
+        err_invalid_dd_image) echo "DD イメージdigestが不正です:" ;;
+        err_invalid_ee_secret) echo "EEシークレット形式が不正です（ee... hex）。" ;;
+        err_invalid_dd_secret) echo "DDシークレット形式が不正です。" ;;
+        err_migrate_port_missing) echo "旧コンテナからホスト側ポートバインドを検出できません。" ;;
+        note_legacy_detected) echo "旧デプロイを検出：コンテナは稼働中ですが env ファイルがありません" ;;
+        note_legacy_migrate) echo "migrate/install を実行して script 管理へ移行してください" ;;
+        ask_new_ee_secret_cli) echo "新しいEEシークレットを入力（hex、空欄=自動生成）: " ;;
+        ask_new_dd_secret_cli) echo "新しいDDシークレットを入力（32hex または dd+32hex）: " ;;
+        note_attempt_restart_ee) echo "[ee] 再起動を試行中..." ;;
+        note_attempt_restart_dd) echo "[dd] 再起動を試行中..." ;;
+        hc_not_installed) echo "未インストール（env ファイル不足）" ;;
+        hc_service_not_active) echo "サービス停止" ;;
+        hc_container_not_running) echo "コンテナ停止" ;;
+        hc_port_not_listening) echo "ポート未待受" ;;
+        hc_image_mismatch) echo "イメージ不一致" ;;
+        hc_healthy) echo "正常" ;;
+        critical_need_systemctl) echo "重大: systemctl が必要です。" ;;
+        critical_need_apt) echo "重大: apt-get が必要です。" ;;
+        preflight_warnings) echo "事前チェック警告:" ;;
+        aborted_by_user) echo "ユーザーにより中断しました。" ;;
       esac
       ;;
   esac
@@ -708,6 +914,8 @@ usage() {
   cat <<'EOF'
 Usage:
   install.sh [install]
+  install.sh migrate [--mode ee|dd|all] [--ee-domain DOMAIN] [--dd-domain DOMAIN] [--front-domain DOMAIN]
+  install.sh rollback [--mode ee|dd|all] [--backup-id ID]
   install.sh self-update
   install.sh uninstall [--mode ee|dd|all]
   install.sh upgrade [--mode ee|dd|all] [--mtg-image IMAGE@sha256:...] [--dd-image IMAGE@sha256:...]
@@ -717,6 +925,8 @@ Usage:
 
 Notes:
   - No arguments: open interactive menu.
+  - migrate imports legacy running containers (mtg-ee / mtproto-dd) into env+systemd management.
+  - rollback restores config and units from latest backup or specified backup ID.
   - self-update pulls the latest script repository by fast-forward only.
   - 'install' command: start interactive install flow directly.
   - rotate-secret for DD accepts either 32-hex or dd+32-hex.
@@ -739,7 +949,7 @@ set_mode_flags() {
       DEPLOY_DD=1
       ;;
     *)
-      echo "Invalid mode: $mode"
+      printf '%s %s\n' "$(t err_mode_value_invalid)" "$mode"
       return 1
       ;;
   esac
@@ -843,14 +1053,14 @@ preflight_checks() {
   local ntp_sync=""
 
   if ! command -v systemctl >/dev/null 2>&1; then
-    echo "Critical: systemctl is required."
+    t critical_need_systemctl
     exit 1
   fi
   if [[ "$(ps -p 1 -o comm= 2>/dev/null || true)" != "systemd" ]]; then
     warnings+=("PID 1 is not systemd; service management may fail.")
   fi
   if ! command -v apt-get >/dev/null 2>&1; then
-    echo "Critical: apt-get is required."
+    t critical_need_apt
     exit 1
   fi
 
@@ -887,10 +1097,10 @@ preflight_checks() {
 
   if ((${#warnings[@]} > 0)); then
     echo
-    echo "Preflight warnings:"
+    t preflight_warnings
     printf ' - %s\n' "${warnings[@]}"
     if ! confirm_continue; then
-      echo "Aborted by user."
+      t aborted_by_user
       exit 1
     fi
   fi
@@ -993,25 +1203,226 @@ upsert_env_key() {
   fi
 }
 
+acquire_run_lock() {
+  if ! command -v flock >/dev/null 2>&1; then
+    t err_lock_unavailable
+    exit 1
+  fi
+  mkdir -p "$(dirname "$LOCK_FILE")"
+  exec 9>"$LOCK_FILE"
+  if ! flock -n 9; then
+    t err_lock_busy
+    exit 1
+  fi
+}
+
+ensure_backup_dir() {
+  mkdir -p "$BACKUP_DIR"
+  chmod 700 "$BACKUP_DIR"
+}
+
+latest_backup_path() {
+  local latest=""
+  latest="$(ls -1dt "$BACKUP_DIR"/* 2>/dev/null | head -n1 || true)"
+  [[ -n "$latest" ]] || return 1
+  printf '%s' "$latest"
+}
+
+resolve_backup_path() {
+  local backup_id="$1"
+  if [[ -z "$backup_id" ]]; then
+    latest_backup_path
+    return
+  fi
+  if [[ -d "$backup_id" ]]; then
+    printf '%s' "$backup_id"
+    return 0
+  fi
+  if [[ -d "${BACKUP_DIR}/${backup_id}" ]]; then
+    printf '%s' "${BACKUP_DIR}/${backup_id}"
+    return 0
+  fi
+  return 1
+}
+
+create_backup() {
+  local action="$1"
+  local stamp=""
+  local backup_path=""
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  ensure_backup_dir
+  backup_path="${BACKUP_DIR}/${stamp}-${action}"
+  mkdir -p "$backup_path"
+  chmod 700 "$backup_path"
+
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    [[ -f "$EE_ENV_FILE" ]] && cp -a "$EE_ENV_FILE" "${backup_path}/ee.env"
+    [[ -f "/etc/systemd/system/${EE_SERVICE_NAME}" ]] && cp -a "/etc/systemd/system/${EE_SERVICE_NAME}" "${backup_path}/${EE_SERVICE_NAME}"
+    [[ -f "/opt/mtg/config.toml" ]] && cp -a "/opt/mtg/config.toml" "${backup_path}/config.toml"
+  fi
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    [[ -f "$DD_ENV_FILE" ]] && cp -a "$DD_ENV_FILE" "${backup_path}/dd.env"
+    [[ -f "/etc/systemd/system/${DD_SERVICE_NAME}" ]] && cp -a "/etc/systemd/system/${DD_SERVICE_NAME}" "${backup_path}/${DD_SERVICE_NAME}"
+  fi
+
+  cat >"${backup_path}/meta.env" <<EOF
+ACTION=${action}
+DEPLOY_EE=${DEPLOY_EE}
+DEPLOY_DD=${DEPLOY_DD}
+CREATED_AT=$(date -Iseconds)
+EOF
+
+  t note_backup_saved
+  echo "${backup_path}"
+}
+
+restore_backup() {
+  local backup_path="$1"
+  local restored=0
+  local unit_changed=0
+
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    if [[ -f "${backup_path}/ee.env" ]]; then
+      ensure_config_dir
+      cp -a "${backup_path}/ee.env" "$EE_ENV_FILE"
+      chmod 600 "$EE_ENV_FILE"
+      restored=1
+    fi
+    if [[ -f "${backup_path}/${EE_SERVICE_NAME}" ]]; then
+      cp -a "${backup_path}/${EE_SERVICE_NAME}" "/etc/systemd/system/${EE_SERVICE_NAME}"
+      unit_changed=1
+      restored=1
+    fi
+    if [[ -f "${backup_path}/config.toml" ]]; then
+      mkdir -p /opt/mtg
+      chmod 700 /opt/mtg
+      cp -a "${backup_path}/config.toml" /opt/mtg/config.toml
+      chmod 600 /opt/mtg/config.toml
+      restored=1
+    fi
+  fi
+
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    if [[ -f "${backup_path}/dd.env" ]]; then
+      ensure_config_dir
+      cp -a "${backup_path}/dd.env" "$DD_ENV_FILE"
+      chmod 600 "$DD_ENV_FILE"
+      restored=1
+    fi
+    if [[ -f "${backup_path}/${DD_SERVICE_NAME}" ]]; then
+      cp -a "${backup_path}/${DD_SERVICE_NAME}" "/etc/systemd/system/${DD_SERVICE_NAME}"
+      unit_changed=1
+      restored=1
+    fi
+  fi
+
+  if [[ "$restored" -eq 0 ]]; then
+    t err_backup_not_found
+    return 1
+  fi
+
+  if [[ "$unit_changed" -eq 1 ]]; then
+    systemd_reload
+  fi
+  if [[ "$DEPLOY_EE" -eq 1 ]] && [[ -f "$EE_ENV_FILE" ]] && [[ -f "/etc/systemd/system/${EE_SERVICE_NAME}" ]]; then
+    systemctl enable --now "$EE_SERVICE_NAME" >/dev/null 2>&1 || true
+  fi
+  if [[ "$DEPLOY_DD" -eq 1 ]] && [[ -f "$DD_ENV_FILE" ]] && [[ -f "/etc/systemd/system/${DD_SERVICE_NAME}" ]]; then
+    systemctl enable --now "$DD_SERVICE_NAME" >/dev/null 2>&1 || true
+  fi
+  return 0
+}
+
+normalize_image_to_digest() {
+  local mode="$1"
+  local image_ref="$2"
+  local repo_digest=""
+  local fallback=""
+
+  if is_valid_digest_image_ref "$image_ref"; then
+    printf '%s' "$image_ref"
+    return 0
+  fi
+
+  repo_digest="$(docker image inspect "$image_ref" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
+  if [[ -n "$repo_digest" ]] && is_valid_digest_image_ref "$repo_digest"; then
+    printf '%s' "$repo_digest"
+    return 0
+  fi
+
+  t warn_image_not_digest
+  if [[ "$mode" == "ee" ]]; then
+    fallback="$MTG_IMAGE"
+  else
+    fallback="$DD_IMAGE"
+  fi
+  printf '%s' "$fallback"
+}
+
+docker_container_exists() {
+  local name="$1"
+  docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "$name"
+}
+
+docker_env_value() {
+  local container="$1"
+  local key="$2"
+  docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$container" 2>/dev/null \
+    | awk -F= -v k="$key" '$1 == k {sub($1"=","",$0); print; exit}'
+}
+
+docker_binding_ip() {
+  local container="$1"
+  local container_port="$2"
+  local ip=""
+  ip="$(docker inspect -f "{{with index .HostConfig.PortBindings \"${container_port}\"}}{{(index . 0).HostIp}}{{end}}" "$container" 2>/dev/null || true)"
+  if [[ -z "$ip" ]]; then
+    ip="0.0.0.0"
+  fi
+  printf '%s' "$ip"
+}
+
+docker_binding_port() {
+  local container="$1"
+  local container_port="$2"
+  docker inspect -f "{{with index .HostConfig.PortBindings \"${container_port}\"}}{{(index . 0).HostPort}}{{end}}" "$container" 2>/dev/null || true
+}
+
+extract_ee_secret_from_config() {
+  if [[ -f /opt/mtg/config.toml ]]; then
+    sed -n 's/^[[:space:]]*secret[[:space:]]*=[[:space:]]*"\([A-Za-z0-9]\+\)".*/\1/p' /opt/mtg/config.toml | head -n1
+  fi
+}
+
 check_mode_health() {
   local mode="$1"
   local service_name=""
   local container_name=""
   local env_file=""
   local port=""
+  local bind_ip=""
+  local expected_image=""
+  local container_port_key=""
   local ok=0
   local mode_container_running=0
+  local service_restarts=0
+  local container_restarts=0
+  local running_image=""
+  local actual_bind_ip=""
+  local actual_bind_port=""
 
   case "$mode" in
     ee)
       service_name="$EE_SERVICE_NAME"
       container_name="$EE_CONTAINER_NAME"
       env_file="$EE_ENV_FILE"
+      container_port_key="3128/tcp"
       ;;
     dd)
       service_name="$DD_SERVICE_NAME"
       container_name="$DD_CONTAINER_NAME"
       env_file="$DD_ENV_FILE"
+      container_port_key="443/tcp"
       ;;
     *)
       return 1
@@ -1024,21 +1435,21 @@ check_mode_health() {
 
   if [[ ! -f "$env_file" ]]; then
     if [[ "$mode_container_running" -eq 1 ]]; then
-      echo "[${mode}] legacy deployment detected: container is running, but env is missing (${env_file})"
-      echo "[${mode}] run install to migrate this instance under script management"
+      printf '[%s] %s (%s)\n' "$mode" "$(t note_legacy_detected)" "$env_file"
+      printf '[%s] %s\n' "$mode" "$(t note_legacy_migrate)"
       return 0
     fi
-    echo "[${mode}] not installed (env missing: ${env_file})"
+    printf '[%s] %s: %s\n' "$mode" "$(t hc_not_installed)" "$env_file"
     return 2
   fi
 
   if ! systemctl is-active --quiet "$service_name"; then
-    echo "[${mode}] service not active: ${service_name}"
+    printf '[%s] %s: %s\n' "$mode" "$(t hc_service_not_active)" "$service_name"
     ok=1
   fi
 
   if ! docker ps --format '{{.Names}}' | grep -qx "$container_name"; then
-    echo "[${mode}] container not running: ${container_name}"
+    printf '[%s] %s: %s\n' "$mode" "$(t hc_container_not_running)" "$container_name"
     ok=1
   fi
 
@@ -1046,17 +1457,50 @@ check_mode_health() {
   source "$env_file"
   if [[ "$mode" == "ee" ]]; then
     port="${EE_PORT}"
+    bind_ip="${EE_BIND_IP:-0.0.0.0}"
+    expected_image="${MTG_IMAGE:-}"
   else
     port="${DD_PORT}"
+    bind_ip="${DD_BIND_IP:-0.0.0.0}"
+    expected_image="${DD_IMAGE:-}"
   fi
+
+  service_restarts="$(systemctl show -p NRestarts --value "$service_name" 2>/dev/null || echo 0)"
+  if [[ "$service_restarts" =~ ^[0-9]+$ ]] && ((service_restarts >= 5)); then
+    printf '[%s] %s %s\n' "$mode" "$(t warn_service_restarts)" "$service_restarts"
+  fi
+
+  container_restarts="$(docker inspect -f '{{.RestartCount}}' "$container_name" 2>/dev/null || echo 0)"
+  if [[ "$container_restarts" =~ ^[0-9]+$ ]] && ((container_restarts >= 5)); then
+    printf '[%s] %s %s\n' "$mode" "$(t warn_container_restarts)" "$container_restarts"
+  fi
+
+  running_image="$(docker inspect -f '{{.Config.Image}}' "$container_name" 2>/dev/null || true)"
+  if [[ -n "$expected_image" && -n "$running_image" && "$running_image" != "$expected_image" ]]; then
+    printf '[%s] %s: running=%s configured=%s\n' "$mode" "$(t hc_image_mismatch)" "$running_image" "$expected_image"
+    ok=1
+  fi
+
+  actual_bind_ip="$(docker_binding_ip "$container_name" "$container_port_key")"
+  actual_bind_port="$(docker_binding_port "$container_name" "$container_port_key")"
+  if [[ -n "$actual_bind_port" ]] && { [[ "$actual_bind_port" != "$port" ]] || [[ "$actual_bind_ip" != "$bind_ip" ]]; }; then
+    echo "[${mode}] $(t err_port_binding_mismatch)"
+    echo "[${mode}] expected=${bind_ip}:${port} actual=${actual_bind_ip}:${actual_bind_port}"
+    ok=1
+  fi
+
   if ! port_in_use "$port"; then
-    echo "[${mode}] port not listening: ${port}"
+    printf '[%s] %s: %s\n' "$mode" "$(t hc_port_not_listening)" "$port"
     ok=1
   fi
 
   if [[ "$ok" -eq 0 ]]; then
-    echo "[${mode}] healthy"
+    printf '[%s] %s\n' "$mode" "$(t hc_healthy)"
     return 0
+  fi
+  if docker_container_exists "$container_name"; then
+    echo "[${mode}] $(t note_recent_logs)"
+    docker logs --tail 5 "$container_name" 2>&1 | sed "s/^/[${mode}] log: /" || true
   fi
   return 1
 }
@@ -1086,7 +1530,7 @@ cmd_self_heal() {
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
     check_mode_health ee || rc=$?
     if [[ "$rc" -eq 1 ]]; then
-      echo "[ee] attempting restart..."
+      t note_attempt_restart_ee
       systemctl restart "$EE_SERVICE_NAME" || true
       sleep 2
       check_mode_health ee || failed=1
@@ -1096,7 +1540,7 @@ cmd_self_heal() {
   if [[ "$DEPLOY_DD" -eq 1 ]]; then
     check_mode_health dd || rc=$?
     if [[ "$rc" -eq 1 ]]; then
-      echo "[dd] attempting restart..."
+      t note_attempt_restart_dd
       systemctl restart "$DD_SERVICE_NAME" || true
       sleep 2
       check_mode_health dd || failed=1
@@ -1121,6 +1565,160 @@ cmd_uninstall() {
   rmdir "$CONFIG_DIR" >/dev/null 2>&1 || true
 }
 
+cmd_rollback() {
+  local backup_id="${1:-}"
+  local backup_path=""
+
+  echo
+  t step_rollback
+  if ! backup_path="$(resolve_backup_path "$backup_id")"; then
+    if [[ -z "$backup_id" ]]; then
+      t note_backup_none
+    else
+      t err_backup_not_found
+      echo "$backup_id"
+    fi
+    return 1
+  fi
+
+  if [[ -z "$backup_id" ]]; then
+    t note_backup_latest
+  else
+    t note_backup_saved
+  fi
+  echo "$backup_path"
+
+  restore_backup "$backup_path"
+  t note_rollback_done
+  cmd_healthcheck || true
+}
+
+cmd_migrate() {
+  local ee_domain_arg="$1"
+  local dd_domain_arg="$2"
+  local front_domain_arg="$3"
+  local ee_secret_input=""
+  local image_ref=""
+  local migrated_any=0
+
+  echo
+  t step_migrate
+  t step_backup
+  create_backup "migrate"
+  ensure_config_dir
+  mkdir -p /opt/mtg
+  chmod 700 /opt/mtg
+
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    if ! docker_container_exists "$EE_CONTAINER_NAME"; then
+      if [[ "$DEPLOY_DD" -eq 1 ]] && docker_container_exists "$DD_CONTAINER_NAME"; then
+        DEPLOY_EE=0
+      else
+        t err_legacy_container_missing
+        echo "$EE_CONTAINER_NAME"
+        return 1
+      fi
+    fi
+  fi
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    if ! docker_container_exists "$DD_CONTAINER_NAME"; then
+      if [[ "$DEPLOY_EE" -eq 1 ]] && docker_container_exists "$EE_CONTAINER_NAME"; then
+        DEPLOY_DD=0
+      else
+        t err_legacy_container_missing
+        echo "$DD_CONTAINER_NAME"
+        return 1
+      fi
+    fi
+  fi
+
+  if [[ "$DEPLOY_EE" -eq 0 && "$DEPLOY_DD" -eq 0 ]]; then
+    t err_migrate_no_legacy
+    return 1
+  fi
+
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    if ! docker_container_exists "$EE_CONTAINER_NAME"; then
+      t err_legacy_container_missing
+      echo "$EE_CONTAINER_NAME"
+      return 1
+    fi
+    EE_DOMAIN="${ee_domain_arg:-}"
+    if [[ -z "$EE_DOMAIN" ]]; then
+      ask_domain ask_ee_domain EE_DOMAIN
+    fi
+    FRONT_DOMAIN="${front_domain_arg:-www.cloudflare.com}"
+    EE_BIND_IP="$(docker_binding_ip "$EE_CONTAINER_NAME" "3128/tcp")"
+    EE_PORT="$(docker_binding_port "$EE_CONTAINER_NAME" "3128/tcp")"
+    if [[ -z "$EE_PORT" ]]; then
+      t err_migrate_port_missing
+      return 1
+    fi
+    image_ref="$(docker inspect -f '{{.Config.Image}}' "$EE_CONTAINER_NAME" 2>/dev/null || true)"
+    MTG_IMAGE="$(normalize_image_to_digest ee "$image_ref")"
+    printf '%s %s\n' "$(t note_using_digest)" "$MTG_IMAGE"
+    EE_SECRET="$(extract_ee_secret_from_config || true)"
+    if [[ -z "$EE_SECRET" ]]; then
+      read -rp "$(t ask_existing_ee_secret)" ee_secret_input
+      ee_secret_input="${ee_secret_input// /}"
+      EE_SECRET="$ee_secret_input"
+    fi
+    if [[ -z "$EE_SECRET" ]]; then
+      t err_ee_secret_required
+      return 1
+    fi
+    umask 077
+    cat >/opt/mtg/config.toml <<EOF
+secret = "$EE_SECRET"
+bind-to = "0.0.0.0:3128"
+EOF
+    chmod 600 /opt/mtg/config.toml
+    write_ee_env_file
+    write_ee_systemd_unit
+    migrated_any=1
+  fi
+
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    DD_DOMAIN="${dd_domain_arg:-}"
+    if [[ -z "$DD_DOMAIN" ]]; then
+      ask_domain ask_dd_domain DD_DOMAIN
+    fi
+    DD_BIND_IP="$(docker_binding_ip "$DD_CONTAINER_NAME" "443/tcp")"
+    DD_PORT="$(docker_binding_port "$DD_CONTAINER_NAME" "443/tcp")"
+    if [[ -z "$DD_PORT" ]]; then
+      t err_migrate_port_missing
+      return 1
+    fi
+    image_ref="$(docker inspect -f '{{.Config.Image}}' "$DD_CONTAINER_NAME" 2>/dev/null || true)"
+    DD_IMAGE="$(normalize_image_to_digest dd "$image_ref")"
+    printf '%s %s\n' "$(t note_using_digest)" "$DD_IMAGE"
+
+    DD_BASE_SECRET="$(docker_env_value "$DD_CONTAINER_NAME" "SECRET")"
+    if ! normalize_dd_secret "$DD_BASE_SECRET"; then
+      t err_invalid_dd_secret
+      return 1
+    fi
+    write_dd_env_file
+    write_dd_systemd_unit
+    migrated_any=1
+  fi
+
+  if [[ "$migrated_any" -eq 0 ]]; then
+    t err_migrate_no_legacy
+    return 1
+  fi
+
+  systemd_reload
+  if [[ "$DEPLOY_EE" -eq 1 ]]; then
+    systemctl enable --now "$EE_SERVICE_NAME" >/dev/null
+  fi
+  if [[ "$DEPLOY_DD" -eq 1 ]]; then
+    systemctl enable --now "$DD_SERVICE_NAME" >/dev/null
+  fi
+  t note_migrate_done
+  cmd_healthcheck || true
+}
+
 cmd_self_update() {
   local script_dir
   script_dir="$(cd "$(dirname "$0")" && pwd -P)"
@@ -1143,9 +1741,13 @@ cmd_upgrade() {
   local current_mtg_image=""
   local current_dd_image=""
 
+  echo
+  t step_backup
+  create_backup "upgrade"
+
   if [[ "$DEPLOY_EE" -eq 1 ]]; then
     [[ -f "$EE_ENV_FILE" ]] || {
-      echo "EE is not installed."
+      t err_not_installed_ee
       return 1
     }
     # shellcheck disable=SC1090
@@ -1153,7 +1755,7 @@ cmd_upgrade() {
     current_mtg_image="${MTG_IMAGE:-}"
     mtg_new_image="${mtg_new_image:-$current_mtg_image}"
     if ! is_valid_digest_image_ref "$mtg_new_image"; then
-      echo "Invalid MTG image digest: $mtg_new_image"
+      printf '%s %s\n' "$(t err_invalid_mtg_image)" "$mtg_new_image"
       return 1
     fi
     upsert_env_key "$EE_ENV_FILE" "MTG_IMAGE" "$mtg_new_image"
@@ -1165,7 +1767,7 @@ cmd_upgrade() {
 
   if [[ "$DEPLOY_DD" -eq 1 ]]; then
     [[ -f "$DD_ENV_FILE" ]] || {
-      echo "DD is not installed."
+      t err_not_installed_dd
       return 1
     }
     # shellcheck disable=SC1090
@@ -1173,7 +1775,7 @@ cmd_upgrade() {
     current_dd_image="${DD_IMAGE:-}"
     dd_new_image="${dd_new_image:-$current_dd_image}"
     if ! is_valid_digest_image_ref "$dd_new_image"; then
-      echo "Invalid DD image digest: $dd_new_image"
+      printf '%s %s\n' "$(t err_invalid_dd_image)" "$dd_new_image"
       return 1
     fi
     upsert_env_key "$DD_ENV_FILE" "DD_IMAGE" "$dd_new_image"
@@ -1204,16 +1806,20 @@ cmd_rotate_secret() {
   local input_secret="$2"
   local front_domain_arg="$3"
 
+  echo
+  t step_backup
+  create_backup "rotate-secret"
+
   case "$mode" in
     ee)
       [[ -f "$EE_ENV_FILE" ]] || {
-        echo "EE is not installed."
+        t err_not_installed_ee
         return 1
       }
       # shellcheck disable=SC1090
       source "$EE_ENV_FILE"
       if [[ -z "$input_secret" ]]; then
-        read -rp "Enter new EE secret (hex). Leave empty to auto-generate: " input_secret
+        read -rp "$(t ask_new_ee_secret_cli)" input_secret
       fi
       if [[ -z "$input_secret" ]]; then
         local use_front=""
@@ -1225,7 +1831,7 @@ cmd_rotate_secret() {
         upsert_env_key "$EE_ENV_FILE" "FRONT_DOMAIN" "$use_front"
       fi
       if [[ ! "$input_secret" =~ ^[Ee][Ee][A-Fa-f0-9]{32,}$ ]]; then
-        echo "Invalid EE secret format (expected ee... hex)."
+        t err_invalid_ee_secret
         return 1
       fi
       EE_SECRET="${input_secret,,}"
@@ -1244,14 +1850,14 @@ EOF
       ;;
     dd)
       [[ -f "$DD_ENV_FILE" ]] || {
-        echo "DD is not installed."
+        t err_not_installed_dd
         return 1
       }
       if [[ -z "$input_secret" ]]; then
-        read -rp "Enter new DD secret (32-hex or dd+32-hex): " input_secret
+        read -rp "$(t ask_new_dd_secret_cli)" input_secret
       fi
       if ! normalize_dd_secret "$input_secret"; then
-        echo "Invalid DD secret format."
+        t err_invalid_dd_secret
         return 1
       fi
       upsert_env_key "$DD_ENV_FILE" "DD_BASE_SECRET" "$DD_BASE_SECRET"
@@ -1264,7 +1870,7 @@ EOF
       systemctl restart "$DD_SERVICE_NAME"
       ;;
     *)
-      echo "rotate-secret requires --mode ee|dd"
+      t err_rotate_mode_required
       return 1
       ;;
   esac
@@ -1533,6 +2139,10 @@ interactive_menu() {
   local mode=""
   local mtg_image_arg=""
   local dd_image_arg=""
+  local migrate_ee_domain=""
+  local migrate_dd_domain=""
+  local migrate_front_domain=""
+  local backup_id=""
   local rotate_mode=""
   local rotate_secret=""
   local rotate_front=""
@@ -1547,9 +2157,11 @@ interactive_menu() {
     echo "3) $(t menu_self_heal)"
     echo "4) $(t menu_upgrade)"
     echo "5) $(t menu_self_update)"
-    echo "6) $(t menu_rotate_secret)"
-    echo "7) $(t menu_uninstall)"
-    echo "8) $(t menu_help)"
+    echo "6) $(t menu_migrate)"
+    echo "7) $(t menu_rollback)"
+    echo "8) $(t menu_rotate_secret)"
+    echo "9) $(t menu_uninstall)"
+    echo "10) $(t menu_help)"
     echo "0) $(t menu_exit)"
     read -rp "> " choice
     choice="${choice// /}"
@@ -1587,6 +2199,28 @@ interactive_menu() {
         cmd_self_update
         ;;
       6)
+        mode="$(prompt_mode_all)"
+        set_mode_flags "$mode" || continue
+        migrate_ee_domain=""
+        migrate_dd_domain=""
+        migrate_front_domain=""
+        if [[ "$DEPLOY_EE" -eq 1 ]]; then
+          ask_domain ask_ee_domain migrate_ee_domain
+          ask_front_domain_with_options
+          migrate_front_domain="$FRONT_DOMAIN"
+        fi
+        if [[ "$DEPLOY_DD" -eq 1 ]]; then
+          ask_domain ask_dd_domain migrate_dd_domain
+        fi
+        cmd_migrate "$migrate_ee_domain" "$migrate_dd_domain" "$migrate_front_domain"
+        ;;
+      7)
+        mode="$(prompt_mode_all)"
+        set_mode_flags "$mode" || continue
+        read -rp "$(t ask_backup_id)" backup_id
+        cmd_rollback "$backup_id"
+        ;;
+      8)
         rotate_mode="$(prompt_mode_rotate)"
         read -rp "$(t ask_new_secret)" rotate_secret
         rotate_front=""
@@ -1598,14 +2232,14 @@ interactive_menu() {
           cmd_healthcheck || true
         fi
         ;;
-      7)
+      9)
         mode="$(prompt_mode_all)"
         set_mode_flags "$mode" || continue
         if confirm_continue; then
           cmd_uninstall
         fi
         ;;
-      8)
+      10)
         usage
         ;;
       0)
@@ -1623,9 +2257,17 @@ main() {
   local mode="all"
   local mtg_image_arg=""
   local dd_image_arg=""
+  local ee_domain_arg=""
+  local dd_domain_arg=""
+  local front_domain_arg=""
+  local backup_id=""
   local rotate_mode=""
   local rotate_secret=""
   local rotate_front=""
+
+  if [[ "$cmd" != "-h" && "$cmd" != "--help" && "$cmd" != "help" ]]; then
+    acquire_run_lock
+  fi
 
   if [[ "$#" -eq 0 ]]; then
     interactive_menu
@@ -1636,10 +2278,62 @@ main() {
     install)
       command_install
       ;;
+    migrate)
+      shift || true
+      while (($#)); do
+        case "$1" in
+          --mode)
+            mode="${2:-all}"
+            shift 2
+            ;;
+          --ee-domain)
+            ee_domain_arg="${2:-}"
+            shift 2
+            ;;
+          --dd-domain)
+            dd_domain_arg="${2:-}"
+            shift 2
+            ;;
+          --front-domain)
+            front_domain_arg="${2:-}"
+            shift 2
+            ;;
+          *)
+            printf '%s %s\n' "$(t err_unknown_arg)" "$1"
+            usage
+            exit 1
+            ;;
+        esac
+      done
+      set_mode_flags "$mode" || exit 1
+      cmd_migrate "$ee_domain_arg" "$dd_domain_arg" "$front_domain_arg"
+      ;;
+    rollback)
+      shift || true
+      while (($#)); do
+        case "$1" in
+          --mode)
+            mode="${2:-all}"
+            shift 2
+            ;;
+          --backup-id)
+            backup_id="${2:-}"
+            shift 2
+            ;;
+          *)
+            printf '%s %s\n' "$(t err_unknown_arg)" "$1"
+            usage
+            exit 1
+            ;;
+        esac
+      done
+      set_mode_flags "$mode" || exit 1
+      cmd_rollback "$backup_id"
+      ;;
     self-update | self_update)
       shift || true
       if (($#)); then
-        echo "Unknown argument: $1"
+        printf '%s %s\n' "$(t err_unknown_arg)" "$1"
         usage
         exit 1
       fi
@@ -1654,7 +2348,7 @@ main() {
             shift 2
             ;;
           *)
-            echo "Unknown argument: $1"
+            printf '%s %s\n' "$(t err_unknown_arg)" "$1"
             usage
             exit 1
             ;;
@@ -1680,7 +2374,7 @@ main() {
             shift 2
             ;;
           *)
-            echo "Unknown argument: $1"
+            printf '%s %s\n' "$(t err_unknown_arg)" "$1"
             usage
             exit 1
             ;;
@@ -1699,7 +2393,7 @@ main() {
             shift 2
             ;;
           *)
-            echo "Unknown argument: $1"
+            printf '%s %s\n' "$(t err_unknown_arg)" "$1"
             usage
             exit 1
             ;;
@@ -1717,7 +2411,7 @@ main() {
             shift 2
             ;;
           *)
-            echo "Unknown argument: $1"
+            printf '%s %s\n' "$(t err_unknown_arg)" "$1"
             usage
             exit 1
             ;;
@@ -1743,14 +2437,14 @@ main() {
             shift 2
             ;;
           *)
-            echo "Unknown argument: $1"
+            printf '%s %s\n' "$(t err_unknown_arg)" "$1"
             usage
             exit 1
             ;;
         esac
       done
       if [[ -z "$rotate_mode" ]]; then
-        echo "rotate-secret requires --mode ee|dd"
+        t err_rotate_mode_required
         exit 1
       fi
       cmd_rotate_secret "$rotate_mode" "$rotate_secret" "$rotate_front"
@@ -1761,7 +2455,7 @@ main() {
       usage
       ;;
     *)
-      echo "Unknown command: $cmd"
+      printf '%s %s\n' "$(t err_unknown_cmd)" "$cmd"
       usage
       exit 1
       ;;
