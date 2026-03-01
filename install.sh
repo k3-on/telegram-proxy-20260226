@@ -1223,7 +1223,10 @@ ensure_backup_dir() {
 
 latest_backup_path() {
   local latest=""
-  latest="$(ls -1dt "$BACKUP_DIR"/* 2>/dev/null | head -n1 || true)"
+  latest="$(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null \
+    | sort -nr \
+    | head -n1 \
+    | sed -E 's/^[0-9.]+ //')"
   [[ -n "$latest" ]] || return 1
   printf '%s' "$latest"
 }
