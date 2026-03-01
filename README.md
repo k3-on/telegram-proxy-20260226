@@ -31,6 +31,12 @@ git -C ~/telegram-proxy-20260226 pull || git clone https://github.com/k3-on/tele
 ```
 
 ### Common Operations
+- `sudo bash install.sh`: open interactive menu (install/manage).
+- `healthcheck --mode all`: check EE/DD service, container, and port health.
+- `self-heal --mode all`: restart unhealthy services automatically.
+- `self-update`: update script repo to latest version.
+- `uninstall --mode all`: remove managed services and related config.
+
 ```bash
 sudo bash install.sh healthcheck --mode all
 sudo bash install.sh self-heal --mode all
@@ -109,6 +115,12 @@ git -C ~/telegram-proxy-20260226 pull || git clone https://github.com/k3-on/tele
 ```
 
 ### 常用命令
+- `sudo bash install.sh`：进入交互式主菜单（安装/管理）。
+- `healthcheck --mode all`：检查 EE/DD 的服务、容器和端口状态。
+- `self-heal --mode all`：自动重启异常服务。
+- `self-update`：更新脚本仓库到最新版。
+- `uninstall --mode all`：卸载脚本托管的服务与配置。
+
 ```bash
 sudo bash install.sh healthcheck --mode all
 sudo bash install.sh self-heal --mode all
@@ -187,6 +199,12 @@ git -C ~/telegram-proxy-20260226 pull || git clone https://github.com/k3-on/tele
 ```
 
 ### 기본 명령
+- `sudo bash install.sh`: 대화형 메인 메뉴를 열어 설치/관리를 진행합니다.
+- `healthcheck --mode all`: EE/DD 서비스, 컨테이너, 포트 상태를 점검합니다.
+- `self-heal --mode all`: 비정상 서비스를 자동 재시작합니다.
+- `self-update`: 스크립트 저장소를 최신 상태로 갱신합니다.
+- `uninstall --mode all`: 스크립트 관리 서비스와 설정을 제거합니다.
+
 ```bash
 sudo bash install.sh healthcheck --mode all
 sudo bash install.sh self-heal --mode all
@@ -265,6 +283,12 @@ git -C ~/telegram-proxy-20260226 pull || git clone https://github.com/k3-on/tele
 ```
 
 ### 基本コマンド
+- `sudo bash install.sh`: 対話式メインメニューを開き、導入/管理を行います。
+- `healthcheck --mode all`: EE/DD のサービス・コンテナ・ポート状態を確認します。
+- `self-heal --mode all`: 異常なサービスを自動で再起動します。
+- `self-update`: スクリプトリポジトリを最新版に更新します。
+- `uninstall --mode all`: スクリプト管理のサービスと設定を削除します。
+
 ```bash
 sudo bash install.sh healthcheck --mode all
 sudo bash install.sh self-heal --mode all
